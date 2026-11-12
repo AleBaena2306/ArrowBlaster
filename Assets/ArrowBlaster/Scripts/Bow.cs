@@ -63,6 +63,12 @@ namespace ArrowBlaster
                 _limbsSprite.sharedMaterial = KenneyArt.Material;
                 _limbsSprite.color = cfg.ink;
                 _limbsSprite.sortingOrder = 12;
+                // Arco negro: el relleno también en tinta plena
+                var mpb = new MaterialPropertyBlock();
+                _limbsSprite.GetPropertyBlock(mpb);
+                mpb.SetFloat("_Wash", 1f);
+                mpb.SetFloat("_Dry", 0.15f);
+                _limbsSprite.SetPropertyBlock(mpb);
             }
             else Debug.LogWarning("[ArrowBlaster] Falta Resources/Kenney/item_bow.png");
 

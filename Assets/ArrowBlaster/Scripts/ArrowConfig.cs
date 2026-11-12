@@ -61,6 +61,10 @@ namespace ArrowBlaster
         public float speedPerForce = 0.08f;
         [Tooltip("Fuerza que se pierde por segundo de vuelo.")]
         public float forceDecayPerSecond = 3.5f;
+        [Tooltip("Fuerza que se gasta por segundo mientras se ataca.")]
+        public float attackDrainPerSecond = 14f;
+        [Tooltip("Velocidad horizontal mientras se ataca (multiplicador); la flecha va en línea recta.")]
+        public float attackSpeedMultiplier = 1.7f;
         [Tooltip("Fuerza que cuesta romper un obstáculo atacando.")]
         public float breakForceCost = 10f;
         [Tooltip("Fuerza que cuesta romper un proyectil atacando.")]

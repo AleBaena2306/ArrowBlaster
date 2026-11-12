@@ -77,12 +77,12 @@ namespace ArrowBlaster
             _pos = new Vector2(0f, 0f);
             _vel = Vector2.zero;
             _force = 0f;
-            _lives = Config.lives;
+            _lives = Config.lives + Upgrades.ExtraLives;
             _runCoins = 0;
             _dragging = false;
             _draw = _drawShown = 0f;
             _aimAngle = 15f;
-            _arrowScale = Config.bowScale * 1.1f;
+            _arrowScale = 1.25f;
             _invulnerable = 0f;
             _attacking = false;
             _launchMultiplier = 1f;
@@ -112,7 +112,8 @@ namespace ArrowBlaster
 
             UpdateArrowVisual();
             UpdateCamera(dt);
-            _hud.Tick(_force, Config.maxForce * 0.5f, _pos.x, Save.Coins + _runCoins);
+            _hud.Tick(_force, _state == State.Aim ? 1f : _startForce, _pos.x, Save.Coins + _runCoins,
+                draining: _attacking && _state == State.Flight, aiming: _state == State.Aim);
         }
 
         private bool _pressedThisFrame, _releasedThisFrame;
@@ -257,7 +258,8 @@ namespace ArrowBlaster
         private void BeginFlight(float multiplier, string label, bool hitLantern)
         {
             _launchMultiplier = multiplier;
-            _force = Mathf.Min(Config.initialForce * multiplier * Mathf.Lerp(0.7f, 1f, _launchDraw), Config.maxForce);
+            _force = Mathf.Min(Config.initialForce * Upgrades.PowerMultiplier * multiplier * Mathf.Lerp(0.7f, 1f, _launchDraw), Config.maxForce);
+            _startForce = Mathf.Max(1f, _force);
             bool perfect = multiplier >= Config.centerMultiplier;
             _hud.Toast($"{label}  ×{multiplier:0.0}", perfect ? Config.attack : Config.ink);
             if (hitLantern)
@@ -268,6 +270,7 @@ namespace ArrowBlaster
                 _shake = perfect ? 0.3f : 0.18f;
                 StartCoroutine(HitStop(perfect ? 0.08f : 0.04f));
             }
+            _attacking = false;
             _vel = new Vector2(Speed(), Mathf.Clamp(_vel.y, -3f, 5f));
             _state = State.Flight;
             _hud.SetHint("Tap to fly · Hold to attack");
@@ -280,7 +283,11 @@ namespace ArrowBlaster
             if (_state == State.Flight) _hud.SetHint("");
         }
 
-        private float Speed() => Config.minSpeed + _force * Config.speedPerForce;
+        private float _startForce = 1f;
+
+        // Atacar: la flecha va en línea recta y más rápida, pero gasta fuerza a cada segundo
+        private float Speed() => (Config.minSpeed + _force * Config.speedPerForce) * Upgrades.SpeedMultiplier
+                                 * (_attacking ? Config.attackSpeedMultiplier : 1f);
 
         private void UpdateFlight(float dt)
         {
@@ -289,14 +296,12 @@ namespace ArrowBlaster
             if (_pressed) _holdTime += dt; else _holdTime = 0f;
             _attacking = _pressed && _holdTime >= Config.holdThreshold;
 
-            if (_attacking)
-            {
-                _vel.y -= Config.gravity * Config.attackGravityScale * dt;
-                _vel.y = Mathf.Lerp(_vel.y, 0f, 6f * dt);
-            }
+            if (_attacking) _vel.y = Mathf.MoveTowards(_vel.y, 0f, 60f * dt); // línea recta
             else _vel.y -= Config.gravity * dt;
 
-            _force = Mathf.Max(0f, _force - Config.forceDecayPerSecond * dt);
+            float drain = Config.forceDecayPerSecond * Upgrades.DecayMultiplier;
+            if (_attacking) drain += Config.attackDrainPerSecond * Upgrades.AttackCostMultiplier;
+            _force = Mathf.Max(0f, _force - drain * dt);
             _vel.x = Speed();
             _pos += _vel * dt;
 
@@ -384,7 +389,7 @@ namespace ArrowBlaster
 
         public void Break(Vector2 at, float forceCost, int coins, Color color)
         {
-            _force = Mathf.Max(0f, _force - forceCost);
+            _force = Mathf.Max(0f, _force - forceCost * Upgrades.AttackCostMultiplier);
             _runCoins += coins;
             _shake = Mathf.Max(_shake, 0.15f);
             Splash(at, color, 10, 1.1f);
@@ -484,7 +489,7 @@ namespace ArrowBlaster
             _bow.transform.position = Config.bowPosition;
             _bow.SetScale(Config.bowScale);
 
-            _lantern = Lantern.Create(_world, Config, 1f);
+            _lantern = Lantern.Create(_world, Config, Upgrades.TargetSpeedMultiplier);
 
             // Puntos de la trayectoria
             _aimDots.Clear();

@@ -12,6 +12,14 @@ namespace ArrowBlaster
         public static int Coins => PlayerPrefs.GetInt(CoinsKey, 0);
         public static float BestDistance => PlayerPrefs.GetFloat(BestKey, 0f);
 
+        public static bool Spend(int coins)
+        {
+            if (coins > Coins) return false;
+            PlayerPrefs.SetInt(CoinsKey, Coins - coins);
+            PlayerPrefs.Save();
+            return true;
+        }
+
         public static void AddRun(int coins, float distance)
         {
             PlayerPrefs.SetInt(CoinsKey, Coins + coins);

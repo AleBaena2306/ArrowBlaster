@@ -82,9 +82,10 @@ namespace ArrowBlaster.Editor
         [MenuItem("ARROW BLASTER/Borrar partida guardada", priority = 2)]
         private static void ClearSave()
         {
-            if (!EditorUtility.DisplayDialog("Arrow Blaster", "¿Borrar las monedas y el récord guardados en este ordenador?", "Borrar", "Cancelar")) return;
+            if (!EditorUtility.DisplayDialog("Arrow Blaster", "¿Borrar las monedas, el récord y las mejoras guardados en este ordenador?", "Borrar", "Cancelar")) return;
             PlayerPrefs.DeleteKey("ab_coins");
             PlayerPrefs.DeleteKey("ab_best");
+            Upgrades.ResetAll();
             PlayerPrefs.Save();
         }
     }

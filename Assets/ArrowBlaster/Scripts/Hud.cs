@@ -21,7 +21,21 @@ namespace ArrowBlaster
         private RectTransform _livesRow;
         private Image _flash;
         private GameObject _overPanel, _pausePanel, _pauseButton;
-        private Text _overTitle, _overBody;
+        private Text _overTitle, _overBody, _overButtonText;
+        private GameObject _shopButton;
+        private RectTransform _forceBar;
+        private float _drainFx;
+        private readonly List<ShopRow> _shopRows = new List<ShopRow>();
+        private bool _shopFromAim;
+
+        private sealed class ShopRow
+        {
+            public Stat Stat;
+            public readonly List<Image> Pips = new List<Image>();
+            public Button Buy;
+            public Text BuyText;
+            public Image BuyImage;
+        }
         private Coroutine _toastRoutine, _smallRoutine, _flashRoutine;
 
         public Hud(ArrowGame game, ArrowConfig cfg)
@@ -48,6 +62,7 @@ namespace ArrowBlaster
         {
             // Barra de fuerza (arriba a la izquierda): trazo de pincel que se vacía
             var bar = Box("ForceBar", _root, new Vector2(0, 1), new Vector2(60, -70), new Vector2(540, 64), new Color(_cfg.ink.r, _cfg.ink.g, _cfg.ink.b, 0.18f));
+            _forceBar = bar;
             bar.GetComponent<Image>().sprite = InkArt.Stroke;
             _forceFill = Box("Fill", bar, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(540, 64), _cfg.ink).GetComponent<Image>();
             _forceFill.sprite = InkArt.Stroke;
@@ -69,6 +84,7 @@ namespace ArrowBlaster
             coin.sprite = InkArt.Blob;
 
             // Pausa
+            _shopButton = MakeButton("Shop", _root, new Vector2(1, 0), new Vector2(-60, 60), new Vector2(300, 100), "SHOP", OpenShopFromAim).gameObject;
             _pauseButton = MakeButton("Pause", _root, new Vector2(1, 1), new Vector2(-50, -50), new Vector2(100, 100), "II", () => _game.SetPaused(true), round: true).gameObject;
 
             // Indicaciones y avisos
@@ -83,9 +99,11 @@ namespace ArrowBlaster
 
             // Fin de run
             _overPanel = Panel("Over");
-            _overTitle = Label("Title", _overPanel.transform, new Vector2(0.5f, 0.5f), new Vector2(0, 200), new Vector2(1000, 140), "", 50, 110, TextAnchor.MiddleCenter, _cfg.ink);
-            _overBody = Label("Body", _overPanel.transform, new Vector2(0.5f, 0.5f), new Vector2(0, 20), new Vector2(900, 220), "", 28, 48, TextAnchor.MiddleCenter, _cfg.ink);
-            MakeButton("Again", _overPanel.transform, new Vector2(0.5f, 0.5f), new Vector2(0, -200), new Vector2(420, 120), "AGAIN", _game.NewRun);
+            _overTitle = Label("Title", _overPanel.transform, new Vector2(0.5f, 0.5f), new Vector2(0, 410), new Vector2(1000, 110), "", 40, 90, TextAnchor.MiddleCenter, _cfg.ink);
+            _overBody = Label("Body", _overPanel.transform, new Vector2(0.5f, 0.5f), new Vector2(0, 320), new Vector2(1200, 60), "", 24, 40, TextAnchor.MiddleCenter, _cfg.ink);
+            BuildShop(_overPanel.transform);
+            var again = MakeButton("Again", _overPanel.transform, new Vector2(0.5f, 0.5f), new Vector2(0, -400), new Vector2(420, 110), "AGAIN", OnOverButton);
+            _overButtonText = again.GetComponentInChildren<Text>();
             _overPanel.SetActive(false);
 
             // Pausa
@@ -108,10 +126,18 @@ namespace ArrowBlaster
 
         public void SetHint(string text) => _hint.text = text;
 
-        public void Tick(float force, float fullForce, float distance, int coins)
+        public void Tick(float force, float fullForce, float distance, int coins, bool draining = false, bool aiming = false)
         {
-            float t = Mathf.Clamp01(force / Mathf.Max(1f, fullForce));
+            float t = aiming ? 1f : Mathf.Clamp01(force / Mathf.Max(1f, fullForce));
             _forceFill.fillAmount = t;
+            _shopButton.SetActive(aiming && !_overPanel.activeSelf);
+
+            // Efecto en la barra mientras se ataca: late en rojo, tiembla y suelta gotas de tinta
+            _drainFx = Mathf.MoveTowards(_drainFx, draining ? 1f : 0f, Time.unscaledDeltaTime * 6f);
+            float pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 24f);
+            _forceFill.color = Color.Lerp(_cfg.ink, _cfg.attack, _drainFx * (0.6f + 0.4f * pulse));
+            _forceBar.anchoredPosition = new Vector2(60, -70) + Random.insideUnitCircle * 5f * _drainFx;
+            if (draining && Random.value < 0.5f) _game.StartCoroutine(Drip(t));
             _distance.text = $"{Mathf.Max(0f, distance):0} m";
             _coins.text = coins.ToString();
         }
@@ -146,9 +172,94 @@ namespace ArrowBlaster
 
         public void ShowOver(float distance, int earned, float best, bool record, string reason)
         {
+            _shopFromAim = false;
             _overTitle.text = record ? "NEW RECORD!" : reason.ToUpperInvariant();
-            _overBody.text = $"{distance:0} m\n+{earned} coins\nBest {best:0} m";
+            _overBody.text = $"{distance:0} m   ·   +{earned} coins   ·   Best {best:0} m";
+            _overButtonText.text = "AGAIN";
+            RefreshShop();
             _overPanel.SetActive(true);
+        }
+
+        private void OpenShopFromAim()
+        {
+            _shopFromAim = true;
+            _overTitle.text = "UPGRADES";
+            _overBody.text = "";
+            _overButtonText.text = "CLOSE";
+            RefreshShop();
+            _overPanel.SetActive(true);
+        }
+
+        private void OnOverButton()
+        {
+            if (_shopFromAim) { _overPanel.SetActive(false); _game.NewRun(); }
+            else _game.NewRun();
+        }
+
+        // ───────────── Tienda ─────────────
+
+        private void BuildShop(Transform parent)
+        {
+            for (int i = 0; i < Upgrades.All.Length; i++)
+            {
+                var def = Upgrades.All[i];
+                float y = 200 - i * 112;
+                var row = new ShopRow { Stat = def.Stat };
+                Label("Name", parent, new Vector2(0.5f, 0.5f), new Vector2(-560, y + 14), new Vector2(380, 56), def.Name, 24, 44, TextAnchor.MiddleLeft, _cfg.ink);
+                Label("Detail", parent, new Vector2(0.5f, 0.5f), new Vector2(-560, y - 30), new Vector2(380, 34), def.Detail, 16, 26, TextAnchor.MiddleLeft, new Color(_cfg.ink.r, _cfg.ink.g, _cfg.ink.b, 0.6f));
+                float pipW = Mathf.Min(44f, 560f / def.MaxLevel);
+                for (int p = 0; p < def.MaxLevel; p++)
+                {
+                    var pip = Box("Pip", parent, new Vector2(0.5f, 0.5f), new Vector2(-340 + p * pipW + pipW * 0.5f, y), new Vector2(pipW - 6, 40), def.Color).GetComponent<Image>();
+                    pip.sprite = InkArt.Stroke;
+                    row.Pips.Add(pip);
+                }
+                var stat = def.Stat;
+                row.Buy = MakeButton("Buy", parent, new Vector2(0.5f, 0.5f), new Vector2(470, y), new Vector2(280, 90), "", () => Buy(stat));
+                row.BuyText = row.Buy.GetComponentInChildren<Text>();
+                row.BuyImage = row.Buy.GetComponent<Image>();
+                _shopRows.Add(row);
+            }
+        }
+
+        private void Buy(Stat stat)
+        {
+            if (Upgrades.TryBuy(stat)) Toast(Upgrades.Get(stat).Name + " +1", Upgrades.Get(stat).Color, small: true);
+            RefreshShop();
+        }
+
+        private void RefreshShop()
+        {
+            int coins = Save.Coins;
+            foreach (var row in _shopRows)
+            {
+                var def = Upgrades.Get(row.Stat);
+                int level = Upgrades.Level(row.Stat);
+                for (int p = 0; p < row.Pips.Count; p++)
+                    row.Pips[p].color = p < level ? def.Color : new Color(def.Color.r, def.Color.g, def.Color.b, 0.15f);
+                bool max = Upgrades.IsMax(row.Stat);
+                int cost = Upgrades.Cost(row.Stat);
+                row.BuyText.text = max ? "MAX" : cost.ToString();
+                bool can = !max && coins >= cost;
+                row.Buy.interactable = can;
+                row.BuyImage.color = can ? _cfg.ink : new Color(_cfg.ink.r, _cfg.ink.g, _cfg.ink.b, 0.3f);
+            }
+        }
+
+        private IEnumerator Drip(float fill)
+        {
+            var img = Box("Drip", _forceBar, new Vector2(0, 0.5f), new Vector2(540f * fill - 10f, Random.Range(-14f, 14f)), Vector2.one * Random.Range(10f, 20f), _cfg.attack).GetComponent<Image>();
+            img.sprite = InkArt.Blob;
+            Vector2 v = new Vector2(Random.Range(-60f, 60f), Random.Range(-260f, -120f));
+            float t = 0f;
+            while (t < 0.5f && img != null)
+            {
+                t += Time.unscaledDeltaTime;
+                img.rectTransform.anchoredPosition += v * Time.unscaledDeltaTime;
+                img.color = new Color(_cfg.attack.r, _cfg.attack.g, _cfg.attack.b, 1f - t / 0.5f);
+                yield return null;
+            }
+            if (img != null) Object.Destroy(img.gameObject);
         }
 
         public void SetPaused(bool paused)
