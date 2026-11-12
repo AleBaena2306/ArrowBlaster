@@ -14,19 +14,39 @@ namespace ArrowBlaster
         public float ceilingY = 4.6f;
         [Tooltip("Tamaño ortográfico de la cámara (medio alto visible).")]
         public float cameraSize = 5.4f;
+        [Tooltip("Posición X de la cámara mientras se apunta.")]
+        public float aimCameraX = 6f;
         [Tooltip("Cuánto se adelanta la cámara a la flecha (la flecha queda a la izquierda).")]
         public float cameraLead = 5.5f;
 
-        [Header("Lanzamiento")]
-        [Tooltip("Oscilaciones por segundo de la mira con la mejora a nivel 0.")]
-        public float aimSpeed = 0.9f;
-        [Tooltip("Recorrido vertical de la mira (desde el centro de la diana).")]
-        public float aimRange = 3.2f;
-        public float targetX = 9f;
-        [Tooltip("Mitad del alto de la diana.")]
-        public float targetHalfHeight = 1.8f;
-        [Tooltip("Mitad del alto del centro de la diana.")]
-        public float targetCenterHalf = 0.35f;
+        [Header("Lanzamiento: arco gigante (arrastrar hacia atrás y soltar)")]
+        [Tooltip("Posición de la empuñadura del arco.")]
+        public Vector2 bowPosition = new Vector2(0f, -1.3f);
+        [Tooltip("Tamaño del arco respecto al normal.")]
+        public float bowScale = 1.8f;
+        [Tooltip("Arrastre (unidades de mundo) para tensar el arco al máximo.")]
+        public float maxDrag = 3f;
+        [Tooltip("Tensión mínima para disparar (si es menor, se cancela).")]
+        public float minDrawToShoot = 0.2f;
+        public float minAimAngle = -25f;
+        public float maxAimAngle = 60f;
+        [Tooltip("Velocidad de salida con el arco poco y muy tenso.")]
+        public float launchSpeedMin = 12f;
+        public float launchSpeedMax = 28f;
+        [Tooltip("Gravedad durante el disparo hasta pasar el farolillo.")]
+        public float launchGravity = 9f;
+
+        [Header("Objetivo del lanzamiento: farolillo que sube y baja")]
+        public float lanternX = 12f;
+        public float lanternMidY = 0.6f;
+        [Tooltip("Recorrido vertical desde el punto medio.")]
+        public float lanternTravel = 2.8f;
+        [Tooltip("Ciclos por segundo con la mejora de puntería a nivel 0 (la mejora lo frena).")]
+        public float lanternSpeed = 0.4f;
+        [Tooltip("Radio del farolillo (acierto normal).")]
+        public float lanternRadius = 1.05f;
+        [Tooltip("Radio del emblema central (acierto perfecto).")]
+        public float lanternCenterRadius = 0.36f;
         public float centerMultiplier = 1.5f;
         public float ringMultiplier = 1.2f;
         public float missMultiplier = 1f;

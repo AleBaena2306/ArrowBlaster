@@ -26,15 +26,19 @@ namespace ArrowBlaster
         private SpriteRenderer[] _arrowParts;
         private TrailRenderer _trail;
         private Bow _bow;
-        private Transform _launchTarget;
+        private Lantern _lantern;
         private readonly List<SpriteRenderer> _aimDots = new List<SpriteRenderer>();
-        private float _drawTime, _dropTimer, _targetPunch;
+        private float _dropTimer;
         private readonly List<Obstacle> _obstacles = new List<Obstacle>();
         private float _nextSpawnX;
 
         // Estado de la run
         private Vector2 _pos, _vel;
-        private float _force, _aimTime, _launchY, _holdTime, _invulnerable, _shake;
+        private float _force, _holdTime, _invulnerable, _shake;
+        // Puntería con el arco gigante
+        private bool _dragging;
+        private Vector2 _dragStart;
+        private float _aimAngle = 15f, _draw, _drawShown, _launchDraw, _arrowScale = 1f;
         private bool _pressed, _attacking;
         private int _lives, _runCoins;
         private float _launchMultiplier = 1f;
@@ -75,16 +79,17 @@ namespace ArrowBlaster
             _force = 0f;
             _lives = Config.lives;
             _runCoins = 0;
-            _aimTime = 0f;
-            _drawTime = 0f;
-            _targetPunch = 0f;
+            _dragging = false;
+            _draw = _drawShown = 0f;
+            _aimAngle = 15f;
+            _arrowScale = Config.bowScale * 1.1f;
             _invulnerable = 0f;
             _attacking = false;
             _launchMultiplier = 1f;
             _nextSpawnX = Config.firstObstacleX;
             _state = State.Aim;
             _hud.ShowRun(_lives);
-            _hud.SetHint("Tap to shoot");
+            _hud.SetHint("Drag back to aim · Release to shoot");
             SetPaused(false);
         }
 
@@ -131,66 +136,139 @@ namespace ArrowBlaster
             return false;
         }
 
-        // Apuntar: la flecha sube y baja delante de la diana; un toque dispara.
-        // Apuntar: el arco se tensa y sube y baja delante de la diana; un toque suelta la flecha.
-        private const float DrawDuration = 0.45f;
-        private const float ArrowTail = 1.12f;   // distancia del centro de la flecha a su culatín
+        // ───────────────────────── Lanzamiento ─────────────────────────
+        // Arco gigante fijo: se arrastra hacia atrás (como un tirachinas) para apuntar y tensar; al soltar, dispara.
+        // La línea de puntos muestra la trayectoria. Atravesar el farolillo multiplica la fuerza de la run.
+        // En ordenador también: mantener Espacio tensa y las flechas arriba/abajo cambian el ángulo.
+        private const float ArrowTail = 1.12f;   // distancia del centro de la flecha a su culatín (escala 1)
+
+        private Vector2 PointerWorld() => _cam.ScreenToWorldPoint(Input.mousePosition);
 
         private void UpdateAim(float dt)
         {
-            _aimTime += dt;
-            _drawTime += dt;
-            float y = Mathf.Sin(_aimTime * Mathf.PI * 2f * Config.aimSpeed) * Config.aimRange;
-            float draw = Mathf.SmoothStep(0f, 1f, _drawTime / DrawDuration);
-            _bow.transform.position = new Vector3(0f, y, 0f);
-            _bow.SetDraw(draw);
-            _pos = new Vector2(_bow.transform.position.x + _bow.NockX + ArrowTail, y);
-            _vel = Vector2.right;
-            UpdateAimDots(true);
+            bool mouseHeld = Input.GetMouseButton(0);
+            bool keyHeld = Input.GetKey(KeyCode.Space);
 
-            if (!_pressedThisFrame || draw < 0.95f) return;
-            _launchY = y;
-            _bow.Release();
-            _state = State.Launch;
-            _vel = new Vector2(30f, 0f);
-            UpdateAimDots(false);
-            _hud.SetHint("");
-            _shake = 0.08f;
+            if (_pressedThisFrame && !keyHeld) { _dragging = true; _dragStart = PointerWorld(); }
+
+            if (_dragging && mouseHeld)
+            {
+                Vector2 drag = _dragStart - PointerWorld();
+                _draw = Mathf.Clamp01(drag.magnitude / Config.maxDrag);
+                if (drag.sqrMagnitude > 0.04f)
+                    _aimAngle = Mathf.Clamp(Mathf.Atan2(drag.y, drag.x) * Mathf.Rad2Deg, Config.minAimAngle, Config.maxAimAngle);
+            }
+            else if (keyHeld)
+            {
+                _draw = Mathf.MoveTowards(_draw, 1f, dt * 1.6f);
+                float turn = (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.W) ? 1f : 0f) - (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S) ? 1f : 0f);
+                _aimAngle = Mathf.Clamp(_aimAngle + turn * 50f * dt, Config.minAimAngle, Config.maxAimAngle);
+            }
+
+            bool released = (_dragging && !mouseHeld) || Input.GetKeyUp(KeyCode.Space);
+            if (released)
+            {
+                _dragging = false;
+                if (_draw >= Config.minDrawToShoot) { Shoot(); return; }
+                _draw = 0f;
+            }
+            if (!_dragging && !keyHeld) _draw = Mathf.MoveTowards(_draw, 0f, dt * 4f);
+
+            _drawShown = Mathf.Lerp(_drawShown, _draw, 1f - Mathf.Exp(-18f * dt));
+            _bow.Aim = _aimAngle;
+            _bow.SetDraw(_drawShown);
+            PlaceArrowOnBow();
+            UpdateTrajectory(_draw >= Config.minDrawToShoot);
         }
 
-        private void UpdateAimDots(bool visible)
+        private Vector2 AimDirection => new Vector2(Mathf.Cos(_aimAngle * Mathf.Deg2Rad), Mathf.Sin(_aimAngle * Mathf.Deg2Rad));
+        private float LaunchSpeed(float draw) => Mathf.Lerp(Config.launchSpeedMin, Config.launchSpeedMax, draw);
+
+        // La flecha (más grande mientras está en el arco) apoyada en la cuerda, apuntando con el arco
+        private void PlaceArrowOnBow()
         {
-            float from = _pos.x + 0.8f, to = Config.targetX - 0.3f;
+            Vector2 dir = AimDirection;
+            float nock = _bow.NockX * Config.bowScale;
+            _pos = Config.bowPosition + dir * (nock + ArrowTail * _arrowScale);
+            _vel = dir;
+        }
+
+        // Puntos de tinta con la trayectoria prevista hasta pasar el farolillo
+        private void UpdateTrajectory(bool visible)
+        {
+            Vector2 p = _pos + AimDirection * 0.6f * _arrowScale;
+            Vector2 v = AimDirection * LaunchSpeed(_draw);
+            const float step = 0.045f;
+            int shown = 0;
             for (int i = 0; i < _aimDots.Count; i++)
             {
+                for (int k = 0; k < 3; k++) { v.y -= Config.launchGravity * step; p += v * step; }
                 var d = _aimDots[i];
-                d.enabled = visible;
-                if (!visible) continue;
-                float t = (i + 0.5f) / _aimDots.Count;
-                d.transform.position = new Vector3(Mathf.Lerp(from, to, t), _pos.y, 0f);
-                d.color = new Color(Config.ink.r, Config.ink.g, Config.ink.b, 0.28f * (1f - t * 0.6f));
+                bool on = visible && p.x < Config.lanternX + 1.5f && p.y > Config.groundY;
+                d.enabled = on;
+                if (!on) continue;
+                shown++;
+                d.transform.position = p;
+                float t = i / (float)_aimDots.Count;
+                d.transform.localScale = Vector3.one * Mathf.Lerp(0.22f, 0.1f, t);
+                d.color = new Color(Config.ink.r, Config.ink.g, Config.ink.b, Mathf.Lerp(0.55f, 0.15f, t));
             }
         }
 
-        // La flecha vuela recta hasta la diana; al cruzarla se decide el multiplicador de fuerza.
+        private void Shoot()
+        {
+            _launchDraw = _draw;
+            _vel = AimDirection * LaunchSpeed(_draw);
+            _bow.Release();
+            _drawShown = 0f;
+            _state = State.Launch;
+            UpdateTrajectory(false);
+            _hud.SetHint("");
+            _shake = 0.12f + 0.15f * _draw;
+        }
+
+        // Vuelo del disparo con gravedad suave hasta cruzar el farolillo (o tocar el suelo)
         private void UpdateLaunch(float dt)
         {
+            float prevX = _pos.x, prevY = _pos.y;
+            _vel.y -= Config.launchGravity * dt;
             _pos += _vel * dt;
-            if (_pos.x < Config.targetX) return;
+            if (_pos.y > Config.ceilingY) { _pos.y = Config.ceilingY; _vel.y = Mathf.Min(_vel.y, 0f); }
 
-            float off = Mathf.Abs(_launchY);
-            string label;
-            Color color;
-            if (off <= Config.targetCenterHalf) { _launchMultiplier = Config.centerMultiplier; label = "PERFECT"; color = Config.attack; }
-            else if (off <= Config.targetHalfHeight) { _launchMultiplier = Config.ringMultiplier; label = "GOOD"; color = Config.ink; }
-            else { _launchMultiplier = Config.missMultiplier; label = "MISS"; color = Config.ink; }
+            float lx = _lantern.X;
+            if (prevX < lx && _pos.x >= lx)
+            {
+                float t = (lx - prevX) / Mathf.Max(0.0001f, _pos.x - prevX);
+                float yAtLantern = Mathf.Lerp(prevY, _pos.y, t);
+                float off = Mathf.Abs(yAtLantern - _lantern.Y);
+                if (off <= Config.lanternCenterRadius) BeginFlight(Config.centerMultiplier, "PERFECT", true);
+                else if (off <= Config.lanternRadius) BeginFlight(Config.ringMultiplier, "GOOD", true);
+                else BeginFlight(Config.missMultiplier, "MISS", false);
+                return;
+            }
+            if (_pos.y <= Config.groundY + 0.2f)
+            {
+                _pos.y = Config.groundY + 0.25f;
+                _vel.y = Config.flapVelocity;
+                BeginFlight(Config.missMultiplier, "MISS", false);
+            }
+        }
 
-            _force = Mathf.Min(Config.initialForce * _launchMultiplier, Config.maxForce);
-            _hud.Toast($"{label}  ×{_launchMultiplier:0.0}", color);
-            _targetPunch = 1f;
-            if (_launchMultiplier > 1f) { Splash(_pos, Config.ink, 12, 1.3f); Splash(_pos, Config.attack, 6, 1f); _shake = 0.25f; }
-            else Splash(_pos, Config.ink, 5, 0.8f);
-            _vel = new Vector2(Speed(), 2f);
+        private void BeginFlight(float multiplier, string label, bool hitLantern)
+        {
+            _launchMultiplier = multiplier;
+            _force = Mathf.Min(Config.initialForce * multiplier * Mathf.Lerp(0.7f, 1f, _launchDraw), Config.maxForce);
+            bool perfect = multiplier >= Config.centerMultiplier;
+            _hud.Toast($"{label}  ×{multiplier:0.0}", perfect ? Config.attack : Config.ink);
+            if (hitLantern)
+            {
+                _lantern.Hit(perfect);
+                Splash(_pos, new Color32(0xC8, 0x10, 0x2E, 0xFF), perfect ? 10 : 5, perfect ? 1.3f : 0.9f);
+                Splash(_pos, Config.ink, perfect ? 10 : 5, 1f);
+                _shake = perfect ? 0.3f : 0.18f;
+                StartCoroutine(HitStop(perfect ? 0.08f : 0.04f));
+            }
+            _vel = new Vector2(Speed(), Mathf.Clamp(_vel.y, -3f, 5f));
             _state = State.Flight;
             _hud.SetHint("Tap to fly · Hold to attack");
             StartCoroutine(HideHintLater(3f));
@@ -381,7 +459,7 @@ namespace ArrowBlaster
             _cam.orthographicSize = Config.cameraSize;
             _cam.clearFlags = CameraClearFlags.SolidColor;
             _cam.backgroundColor = Config.paper;
-            _cam.transform.position = new Vector3(Config.targetX * 0.5f, 0f, -10f);
+            _cam.transform.position = new Vector3(Config.aimCameraX, 0f, -10f);
         }
 
         private static void EnsureEventSystem()
@@ -395,25 +473,19 @@ namespace ArrowBlaster
         private void BuildLaunchArea()
         {
             _bow = Bow.Create(_world, Config);
+            _bow.transform.position = Config.bowPosition;
+            _bow.SetScale(Config.bowScale);
 
-            // Diana (mato) de anillos de tinta sobre un poste, con el centro rojo
-            float r = Config.targetHalfHeight;
-            _launchTarget = new GameObject("LaunchTarget").transform;
-            _launchTarget.SetParent(_world, false);
-            _launchTarget.localPosition = new Vector2(Config.targetX, 0f);
-            float postH = -Config.groundY + 0.5f;
-            Gfx.Shape("Post", InkArt.Stroke, _world, new Vector2(Config.targetX + 0.1f, -postH * 0.5f), new Vector2(postH, 0.32f), Config.ink, 2)
-                .transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
-            float[] rings = { 1f, 0.9f, 0.74f, 0.62f, 0.46f, 0.36f };
-            for (int i = 0; i < rings.Length; i++)
-                Gfx.Shape("Ring" + i, Gfx.Circle, _launchTarget, Vector2.zero, Vector2.one * r * 2f * rings[i], i % 2 == 0 ? Config.ink : Config.paper, 3 + i);
-            Gfx.Shape("Center", Gfx.Circle, _launchTarget, Vector2.zero, Vector2.one * Config.targetCenterHalf * 2f, Config.attack, 10);
-            Gfx.Shape("Enso", InkArt.Ring, _launchTarget, Vector2.zero, Vector2.one * r * 2.35f, Config.ink, 11);
+            _lantern = Lantern.Create(_world, Config, 1f);
 
-            // Guía de puntería: puntos de tinta hasta la diana
+            // Puntos de la trayectoria
             _aimDots.Clear();
-            for (int i = 0; i < 9; i++)
-                _aimDots.Add(Gfx.Shape("AimDot", InkArt.Blob, _world, Vector2.zero, Vector2.one * 0.16f, Config.inkSoft, 2));
+            for (int i = 0; i < 16; i++)
+            {
+                var d = Gfx.Shape("AimDot", InkArt.Blob, _world, Vector2.zero, Vector2.one * 0.16f, Config.inkSoft, 15);
+                d.enabled = false;
+                _aimDots.Add(d);
+            }
         }
 
         private void BuildArrow()
@@ -447,13 +519,16 @@ namespace ArrowBlaster
         private Vector2 TipPosition()
         {
             float a = Mathf.Atan2(_vel.y, Mathf.Max(0.01f, _vel.x));
-            return _pos + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * 0.55f;
+            return _pos + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * 0.55f * _arrowScale;
         }
 
         private void UpdateArrowVisual()
         {
             if (_arrow == null) return;
             _arrow.position = _pos;
+            // La flecha es grande en el arco gigante y recupera su tamaño al empezar el vuelo
+            if (_state != State.Aim && _state != State.Launch) _arrowScale = Mathf.MoveTowards(_arrowScale, 1f, Time.deltaTime * 4f);
+            _arrow.localScale = new Vector3(_arrowScale, _arrowScale, 1f);
             float angle = Mathf.Atan2(_vel.y, Mathf.Max(0.01f, _vel.x)) * Mathf.Rad2Deg;
             _arrow.rotation = Quaternion.Euler(0f, 0f, angle);
 
@@ -462,24 +537,16 @@ namespace ArrowBlaster
             _arrowHead.transform.localScale = _attacking ? new Vector3(0.42f, 0.32f, 1f) : new Vector3(0.26f, 0.2f, 1f);
             foreach (var part in _arrowParts) part.enabled = !blink;
             _trail.emitting = _state == State.Launch || _state == State.Flight || _state == State.Falling;
-            _trail.widthMultiplier = _attacking ? 2.4f : 1f;
+            _trail.widthMultiplier = (_attacking ? 2.4f : 1f) * _arrowScale;
             Color tc = _attacking ? Config.attack : Config.ink;
             _trail.startColor = new Color(tc.r, tc.g, tc.b, 0.9f);
             _trail.endColor = new Color(tc.r, tc.g, tc.b, 0f);
 
-            if (_launchTarget != null)
-            {
-                _targetPunch = Mathf.MoveTowards(_targetPunch, 0f, Time.deltaTime * 3f);
-                float k = Mathf.Sin(_targetPunch * Mathf.PI * 3f) * _targetPunch * 0.12f;
-                _launchTarget.localScale = new Vector3(1f - k, 1f + k, 1f);
-            }
         }
 
         private void UpdateCamera(float dt)
         {
-            float targetX = _state == State.Aim || _state == State.Launch && _pos.x < Config.targetX
-                ? Config.targetX * 0.5f
-                : _pos.x + Config.cameraLead;
+            float targetX = _state == State.Aim ? Config.aimCameraX : Mathf.Max(Config.aimCameraX, _pos.x + Config.cameraLead);
             var p = _cam.transform.position;
             p.x = Mathf.Lerp(p.x, targetX, 1f - Mathf.Exp(-8f * dt));
             p.y = 0f;

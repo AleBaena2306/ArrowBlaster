@@ -40,7 +40,7 @@ namespace ArrowBlaster.Editor
             cam.orthographicSize = config.cameraSize;
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = config.paper;
-            camGo.transform.position = new Vector3(config.targetX * 0.5f, 0f, -10f);
+            camGo.transform.position = new Vector3(config.aimCameraX, 0f, -10f);
 
             var es = new GameObject("EventSystem");
             es.AddComponent<EventSystem>();

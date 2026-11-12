@@ -16,9 +16,21 @@ namespace ArrowBlaster
 
         private LineRenderer _limbs, _string;
         private Transform _grip;
-        private float _draw, _releaseTime = -1f, _releaseFrom;
+        private float _draw, _releaseTime = -1f, _releaseFrom, _wobble;
+        // Ángulo de puntería en grados (el arco gira entero)
+        public float Aim;
 
         public float Draw => _draw;
+        private float _scale = 1f;
+
+        // Arco más grande: la geometría escala con el transform, el grosor de las líneas se ajusta aparte
+        public void SetScale(float scale)
+        {
+            _scale = scale;
+            transform.localScale = new Vector3(scale, scale, 1f);
+            _limbs.widthMultiplier = scale;
+            _string.widthMultiplier = 0.028f * scale;
+        }
         // Posición (local X) del culatín de la flecha en la cuerda
         public float NockX { get; private set; } = RestNockX;
 
@@ -92,15 +104,16 @@ namespace ArrowBlaster
                 // La cuerda pasa de largo y vibra amortiguada; el arco da un pequeño latigazo
                 float t = _releaseTime;
                 vibration = _releaseFrom * 0.45f * Mathf.Exp(-7f * t) * Mathf.Cos(t * 55f);
-                transform.localRotation = Quaternion.Euler(0f, 0f, -6f * _releaseFrom * Mathf.Exp(-6f * t) * Mathf.Sin(t * 30f));
+                _wobble = -6f * _releaseFrom * Mathf.Exp(-6f * t) * Mathf.Sin(t * 30f);
             }
             else
             {
                 // Temblor de tensión cuando está casi al máximo
                 float tremble = Mathf.SmoothStep(0.85f, 1f, draw) * 0.012f;
-                transform.localRotation = Quaternion.Euler(0f, 0f, (Mathf.PerlinNoise(Time.time * 14f, 0f) - 0.5f) * tremble * 60f);
+                _wobble = (Mathf.PerlinNoise(Time.time * 14f, 0f) - 0.5f) * tremble * 60f;
             }
 
+            transform.localRotation = Quaternion.Euler(0f, 0f, Aim + _wobble);
             float tipX = Mathf.Lerp(RestTipX, DrawnTipX, draw);
             float squeeze = Mathf.Lerp(1f, 0.93f, draw);
             Vector2 topTip = Vector2.zero, bottomTip = Vector2.zero;
