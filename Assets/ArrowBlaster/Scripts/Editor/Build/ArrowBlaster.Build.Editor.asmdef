@@ -1,0 +1,16 @@
+{
+    "name": "ArrowBlaster.Build.Editor",
+    "rootNamespace": "ArrowBlaster.Editor",
+    "references": ["KovusPride.Web.Editor"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": ["KP_FRAMEWORK"],
+    "versionDefines": [
+        { "name": "com.kovuspride.framework", "expression": "0.1.0", "define": "KP_FRAMEWORK" }
+    ],
+    "noEngineReferences": false
+}
