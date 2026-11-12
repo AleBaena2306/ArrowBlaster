@@ -28,7 +28,7 @@ namespace ArrowBlaster
             _scale = scale;
             transform.localScale = new Vector3(scale, scale, 1f);
             _limbs.widthMultiplier = scale;
-            _string.widthMultiplier = 0.028f * scale;
+            _string.widthMultiplier = 0.012f * scale;
         }
         // Posición (local X) del culatín de la flecha en la cuerda
         public float NockX { get; private set; } = RestNockX;
@@ -44,25 +44,27 @@ namespace ArrowBlaster
 
         private void Build(ArrowConfig cfg)
         {
-            _limbs = MakeLine("Limbs", Segments, cfg.ink, 12);
-            // Una sola pincelada: entra fina, engorda en la empuñadura y sale seca
+            // Una sola pincelada gruesa y seca, que se afila en las puntas curvadas
+            _limbs = MakeLine("Limbs", Segments, cfg.ink, 12, dry: 1f, wobble: 0.03f);
             _limbs.widthCurve = new AnimationCurve(
-                new Keyframe(0f, 0.03f), new Keyframe(0.6f, 0.11f), new Keyframe(1f, 0.02f));
+                new Keyframe(0f, 0f), new Keyframe(0.07f, 0.09f), new Keyframe(0.25f, 0.16f), new Keyframe(0.75f, 0.16f),
+                new Keyframe(0.93f, 0.08f), new Keyframe(1f, 0f));
 
-            _string = MakeLine("String", 3, new Color(cfg.ink.r, cfg.ink.g, cfg.ink.b, 0.75f), 11);
-            _string.widthMultiplier = 0.028f;
+            // Cuerda: línea fina y limpia, gris oscuro
+            _string = MakeLine("String", 3, new Color(0.25f, 0.25f, 0.25f, 1f), 11, dry: 0f, wobble: 0f);
+            _string.widthMultiplier = 0.012f;
 
             Refresh();
         }
 
-        private LineRenderer MakeLine(string name, int points, Color color, int order)
+        private LineRenderer MakeLine(string name, int points, Color color, int order, float dry, float wobble)
         {
             var go = new GameObject(name);
             go.transform.SetParent(transform, false);
             var lr = go.AddComponent<LineRenderer>();
             lr.useWorldSpace = false;
             lr.positionCount = points;
-            InkArt.Apply(lr, dry: 0.8f);
+            InkArt.Apply(lr, dry: dry, wobble: wobble, bristles: 30f);
             lr.startColor = lr.endColor = color;
             lr.numCapVertices = 4;
             lr.numCornerVertices = 2;
@@ -121,6 +123,8 @@ namespace ArrowBlaster
                 // s: -1 en la punta superior, 0 en la empuñadura, 1 en la inferior (asimétrico)
                 float s = y >= 0f ? -y / (Top * squeeze) : y / (Bottom * squeeze);
                 float x = Mathf.Lerp(Bulge, tipX, s * s);
+                // Puntas que se curvan hacia delante (recurvado), como en la referencia
+                x += Mathf.SmoothStep(0.75f, 1f, Mathf.Abs(s)) * 0.16f;
                 _limbs.SetPosition(i, new Vector3(x, y, 0f));
                 if (i == 0) topTip = new Vector2(x, y);
                 if (i == Segments - 1) bottomTip = new Vector2(x, y);

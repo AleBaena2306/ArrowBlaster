@@ -10,6 +10,8 @@ namespace ArrowBlaster
         private static readonly int SeedId = Shader.PropertyToID("_Seed");
         private static readonly int WorldId = Shader.PropertyToID("_WorldSpace");
         private static readonly int DryId = Shader.PropertyToID("_Dry");
+        private static readonly int WobbleId = Shader.PropertyToID("_Wobble");
+        private static readonly int BristlesId = Shader.PropertyToID("_Bristles");
 
         // Material del shader de tinta (Resources/ArrowBlasterInk.shader). Si no está disponible, sprites normales.
         public static Material Ink
@@ -31,7 +33,7 @@ namespace ArrowBlaster
         // Pone el material de tinta con una semilla propia, para que cada pincelada sea distinta.
         // worldSpace: el ruido usa coordenadas del mundo (formas que siguen a la cámara, como el suelo).
         // dry: cuánto pincel seco (null = el valor del material).
-        public static void Apply(Renderer r, bool worldSpace = false, float? dry = null)
+        public static void Apply(Renderer r, bool worldSpace = false, float? dry = null, float? wobble = null, float? bristles = null)
         {
             r.sharedMaterial = Ink;
             var mpb = new MaterialPropertyBlock();
@@ -39,6 +41,8 @@ namespace ArrowBlaster
             mpb.SetFloat(SeedId, Random.Range(0f, 100f));
             mpb.SetFloat(WorldId, worldSpace ? 1f : 0f);
             if (dry.HasValue) mpb.SetFloat(DryId, dry.Value);
+            if (wobble.HasValue) mpb.SetFloat(WobbleId, wobble.Value);
+            if (bristles.HasValue) mpb.SetFloat(BristlesId, bristles.Value);
             r.SetPropertyBlock(mpb);
         }
         private static Sprite _paper, _stroke, _blob, _ring;

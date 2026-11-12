@@ -502,14 +502,24 @@ namespace ArrowBlaster
         {
             _arrow = new GameObject("Arrow").transform;
             _arrow.SetParent(_world, false);
-            // Tres pinceladas: astil (fino detrás, grueso delante), punta y dos plumas rojas
-            var shaftCurve = new AnimationCurve(new Keyframe(0f, 0.35f), new Keyframe(0.85f, 1f), new Keyframe(1f, 0.6f));
-            Brush.Stroke("Shaft", _arrow, new Vector3[] { new Vector3(-1.12f, 0f), new Vector3(-0.4f, 0.01f), new Vector3(0.35f, 0f) },
-                0.09f, Config.ink, 11, 0.5f, shaftCurve);
-            var pointCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0.05f));
-            _arrowHead = Brush.Stroke("Head", _arrow, new Vector3[] { new Vector3(0.25f, 0f), new Vector3(0.62f, 0f) }, 0.2f, Config.ink, 12, 0.2f, pointCurve);
-            Brush.Line("FeatherTop", _arrow, new Vector2(-1.15f, 0.14f), new Vector2(-0.72f, 0.02f), 0.07f, Config.attack, 10, 0.1f);
-            Brush.Line("FeatherBottom", _arrow, new Vector2(-1.15f, -0.14f), new Vector2(-0.72f, -0.02f), 0.07f, Config.attack, 10, 0.1f);
+            // Como la referencia: astil fino y seco, punta de dos trazos cortos y plumas de varios trazos hacia atrás
+            var shaftCurve = new AnimationCurve(new Keyframe(0f, 0.7f), new Keyframe(0.5f, 1f), new Keyframe(1f, 0.55f));
+            Brush.Stroke("Shaft", _arrow, new Vector3[] { new Vector3(-1.05f, 0f), new Vector3(-0.3f, 0.008f), new Vector3(0.5f, 0f) },
+                0.045f, Config.ink, 11, 1f, shaftCurve, 0.004f);
+            var point = new AnimationCurve(new Keyframe(0f, 0.3f), new Keyframe(0.35f, 1f), new Keyframe(1f, 0.05f));
+            _arrowHead = Brush.Stroke("Head", _arrow, new Vector3[] { new Vector3(0.4f, 0.075f), new Vector3(0.52f, 0.03f), new Vector3(0.64f, 0f) },
+                0.08f, Config.ink, 12, 0.6f, point, 0.01f);
+            Brush.Stroke("HeadBarb", _arrow, new Vector3[] { new Vector3(0.44f, -0.06f), new Vector3(0.53f, -0.02f), new Vector3(0.62f, 0f) },
+                0.06f, Config.ink, 12, 0.6f, point, 0.01f);
+            var feather = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0.1f));
+            for (int i = 0; i < 6; i++)
+            {
+                float side = i % 2 == 0 ? 1f : -1f;
+                float x0 = -0.78f - i * 0.045f;
+                float spread = 0.09f + (i % 3) * 0.045f;
+                Brush.Stroke("Feather", _arrow, new Vector3[] { new Vector3(x0, 0f), new Vector3(x0 - 0.16f, side * spread * 0.6f), new Vector3(x0 - 0.3f, side * spread) },
+                    0.05f, Config.ink, 10, 1f, feather, 0.008f);
+            }
 
             _arrowParts = _arrow.GetComponentsInChildren<LineRenderer>();
             _arrowBaseWidths = new float[_arrowParts.Length];
@@ -543,7 +553,7 @@ namespace ArrowBlaster
 
             bool blink = _invulnerable > 0f && Mathf.Repeat(Time.time * 12f, 1f) < 0.5f;
             _arrowHead.startColor = _arrowHead.endColor = _attacking ? Config.attack : Config.ink;
-            _arrowHead.widthMultiplier = (_attacking ? 0.34f : 0.2f) * _arrowScale;
+            _arrowHead.widthMultiplier = (_attacking ? 0.14f : 0.08f) * _arrowScale;
             foreach (var part in _arrowParts) part.enabled = !blink;
             if (!Mathf.Approximately(_lastArrowScale, _arrowScale))
             {

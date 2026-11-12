@@ -10,7 +10,7 @@ namespace ArrowBlaster
         private static readonly AnimationCurve Taper = new AnimationCurve(
             new Keyframe(0f, 0.35f), new Keyframe(0.12f, 1f), new Keyframe(0.75f, 0.85f), new Keyframe(1f, 0.15f));
 
-        public static LineRenderer Stroke(string name, Transform parent, Vector3[] points, float width, Color color, int order, float dry = 0.7f, AnimationCurve curve = null)
+        public static LineRenderer Stroke(string name, Transform parent, Vector3[] points, float width, Color color, int order, float dry = 0.7f, AnimationCurve curve = null, float? wobble = null)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
@@ -25,7 +25,7 @@ namespace ArrowBlaster
             lr.numCornerVertices = 3;
             lr.sortingOrder = order;
             lr.alignment = LineAlignment.View;
-            InkArt.Apply(lr, dry: dry);
+            InkArt.Apply(lr, dry: dry, wobble: wobble, bristles: 30f);
             return lr;
         }
 
