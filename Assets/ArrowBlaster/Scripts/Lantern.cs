@@ -2,8 +2,8 @@ using UnityEngine;
 
 namespace ArrowBlaster
 {
-    // Objetivo del lanzamiento: ensō de tinta colgado de una cuerda, que sube y baja.
-    // Atravesar el toque rojo del centro = PERFECT; el resto del círculo = GOOD.
+    // Objetivo del lanzamiento: diana colgada de una cuerda, que sube y baja.
+    // Atravesar el centro = PERFECT; el resto de la diana = GOOD.
     public sealed class Lantern : MonoBehaviour
     {
         private ArrowConfig _cfg;
@@ -45,9 +45,9 @@ namespace ArrowBlaster
             _body = new GameObject("Body").transform;
             _body.SetParent(transform, false);
 
-            // Objetivo: ensō de tinta (acierto normal) y un toque rojo en el centro (acierto perfecto)
-            Brush.Enso("Enso", _body, Vector2.zero, r * 0.9f, 0.3f, _cfg.ink, 5, 330f);
-            Brush.Dab("Center", _body, Vector2.zero, _cfg.lanternCenterRadius * 2f, red, 7);
+            // Objetivo: diana de Kenney (Shooting Gallery «target_red1»); conserva el rojo de los anillos.
+            // La diana ocupa todo el sprite: su radio exterior coincide con lanternRadius.
+            KenneyArt.Shape("target_red1", _body, Vector2.zero, r * 2f, _cfg.ink, 5, keepColor: true);
         }
 
         // El acierto hace que el farolillo se balancee y dé un pequeño bote

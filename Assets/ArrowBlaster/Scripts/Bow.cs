@@ -18,9 +18,9 @@ namespace ArrowBlaster
         private Transform _limbs;
         private SpriteRenderer _limbsSprite;
 
-        // Imagen del arco (Resources/BowLimbs.png, sin cuerda, vertical, abombado hacia delante).
-        // Coordenadas en píxeles de esa imagen: puntas y punto más adelantado (empuñadura).
-        private const float ImgTipX = 19.5f, ImgTopY = 4f, ImgBottomY = 505f, ImgGripX = 95f;
+        // Imagen del arco: Kenney Scribble Platformer «item_bow» (vertical, abombado hacia delante, sin cuerda).
+        // Coordenadas en píxeles de esa imagen (128 × 128): puntas y punto más adelantado (empuñadura).
+        private const float ImgTipX = 50f, ImgTopY = 1f, ImgBottomY = 127f, ImgGripX = 83f;
         private float _draw, _releaseTime = -1f, _releaseFrom, _wobble;
         // Ángulo de puntería en grados (el arco gira entero)
         public float Aim;
@@ -50,7 +50,7 @@ namespace ArrowBlaster
         private void Build(ArrowConfig cfg)
         {
             // Arco: imagen de pincel; si falta, no se dibuja (la cuerda sigue funcionando)
-            var tex = Resources.Load<Texture2D>("BowLimbs");
+            var tex = Resources.Load<Texture2D>("Kenney/item_bow");
             _limbs = new GameObject("Limbs").transform;
             _limbs.SetParent(transform, false);
             if (tex != null)
@@ -60,11 +60,11 @@ namespace ArrowBlaster
                 var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), pivot, ppu, 0, SpriteMeshType.FullRect);
                 _limbsSprite = _limbs.gameObject.AddComponent<SpriteRenderer>();
                 _limbsSprite.sprite = sprite;
-                _limbsSprite.sharedMaterial = InkArt.SpriteMaterial;
+                _limbsSprite.sharedMaterial = KenneyArt.Material;
                 _limbsSprite.color = cfg.ink;
                 _limbsSprite.sortingOrder = 12;
             }
-            else Debug.LogWarning("[ArrowBlaster] Falta Resources/BowLimbs.png");
+            else Debug.LogWarning("[ArrowBlaster] Falta Resources/Kenney/item_bow.png");
 
             // Cuerda: línea fina y limpia, gris oscuro
             _string = MakeLine("String", 3, new Color(0.25f, 0.25f, 0.25f, 1f), 11, dry: 0f, wobble: 0f);

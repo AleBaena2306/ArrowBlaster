@@ -23,9 +23,7 @@ namespace ArrowBlaster
         private Transform _world;
         private Transform _arrow;
         private LineRenderer _arrowHead;
-        private LineRenderer[] _arrowParts;
-        private float[] _arrowBaseWidths;
-        private float _lastArrowScale = -1f;
+        private Renderer[] _arrowRenderers;
         private TrailRenderer _trail;
         private Bow _bow;
         private Lantern _lantern;
@@ -502,29 +500,14 @@ namespace ArrowBlaster
         {
             _arrow = new GameObject("Arrow").transform;
             _arrow.SetParent(_world, false);
-            // Como la referencia: astil fino y seco, punta de dos trazos cortos y plumas de varios trazos hacia atrás
-            var shaftCurve = new AnimationCurve(new Keyframe(0f, 0.7f), new Keyframe(0.5f, 1f), new Keyframe(1f, 0.55f));
-            Brush.Stroke("Shaft", _arrow, new Vector3[] { new Vector3(-1.05f, 0f), new Vector3(-0.3f, 0.008f), new Vector3(0.5f, 0f) },
-                0.045f, Config.ink, 11, 1f, shaftCurve, 0.004f);
+            // Flecha de Kenney (item_arrow, punta a la derecha) en tinta; la punta roja solo aparece al atacar
+            // En la imagen: cola en x = 15 px, punta en x = 113 px (98 px = 1,74 unidades a escala 1)
+            KenneyArt.Shape("item_arrow", _arrow, Vector2.zero, 128f / 56.3f, Config.ink, 11, pivot: new Vector2(78f / 128f, 0.5f));
             var point = new AnimationCurve(new Keyframe(0f, 0.3f), new Keyframe(0.35f, 1f), new Keyframe(1f, 0.05f));
-            _arrowHead = Brush.Stroke("Head", _arrow, new Vector3[] { new Vector3(0.4f, 0.075f), new Vector3(0.52f, 0.03f), new Vector3(0.64f, 0f) },
-                0.08f, Config.ink, 12, 0.6f, point, 0.01f);
-            Brush.Stroke("HeadBarb", _arrow, new Vector3[] { new Vector3(0.44f, -0.06f), new Vector3(0.53f, -0.02f), new Vector3(0.62f, 0f) },
-                0.06f, Config.ink, 12, 0.6f, point, 0.01f);
-            var feather = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0.1f));
-            for (int i = 0; i < 6; i++)
-            {
-                float side = i % 2 == 0 ? 1f : -1f;
-                float x0 = -0.78f - i * 0.045f;
-                float spread = 0.09f + (i % 3) * 0.045f;
-                Brush.Stroke("Feather", _arrow, new Vector3[] { new Vector3(x0, 0f), new Vector3(x0 - 0.16f, side * spread * 0.6f), new Vector3(x0 - 0.3f, side * spread) },
-                    0.05f, Config.ink, 10, 1f, feather, 0.008f);
-            }
+            _arrowHead = Brush.Stroke("Head", _arrow, new Vector3[] { new Vector3(0.38f, 0f), new Vector3(0.5f, 0f), new Vector3(0.66f, 0f) },
+                0.14f, Config.attack, 12, 0.3f, point, 0.01f);
+            _arrowRenderers = _arrow.GetComponentsInChildren<Renderer>();
 
-            _arrowParts = _arrow.GetComponentsInChildren<LineRenderer>();
-            _arrowBaseWidths = new float[_arrowParts.Length];
-            for (int i = 0; i < _arrowParts.Length; i++) _arrowBaseWidths[i] = _arrowParts[i].widthMultiplier;
-            _lastArrowScale = -1f;
             _trail = _arrow.gameObject.AddComponent<TrailRenderer>();
             InkArt.Apply(_trail, dry: 0.45f, wobble: 0.02f);
             _trail.time = 0.6f;
@@ -552,16 +535,9 @@ namespace ArrowBlaster
             _arrow.rotation = Quaternion.Euler(0f, 0f, angle);
 
             bool blink = _invulnerable > 0f && Mathf.Repeat(Time.time * 12f, 1f) < 0.5f;
-            _arrowHead.startColor = _arrowHead.endColor = _attacking ? Config.attack : Config.ink;
-            _arrowHead.widthMultiplier = (_attacking ? 0.14f : 0.08f) * _arrowScale;
-            foreach (var part in _arrowParts) part.enabled = !blink;
-            if (!Mathf.Approximately(_lastArrowScale, _arrowScale))
-            {
-                // El grosor de las líneas no escala con el transform: se ajusta a mano
-                for (int i = 0; i < _arrowParts.Length; i++)
-                    if (_arrowParts[i] != _arrowHead) _arrowParts[i].widthMultiplier = _arrowBaseWidths[i] * _arrowScale;
-                _lastArrowScale = _arrowScale;
-            }
+            _arrowHead.widthMultiplier = 0.14f * _arrowScale;
+            foreach (var part in _arrowRenderers)
+                if (!(part is TrailRenderer)) part.enabled = !blink && (part != _arrowHead || _attacking);
             _trail.emitting = _state == State.Launch || _state == State.Flight || _state == State.Falling;
             _trail.widthMultiplier = (_attacking ? 1.6f : 1f) * _arrowScale;
             Color tc = Config.ink; // la estela siempre es de tinta: solo la punta se pone roja al atacar
@@ -588,7 +564,9 @@ namespace ArrowBlaster
         // Salpicadura de tinta: manchas que salen despedidas y se desvanecen, y una mancha que queda un momento
         private void Splash(Vector2 at, Color color, int count, float power)
         {
-            // Latigazos de pincel que salen del punto de impacto
+            // Estallido de Kenney (effect_blast) y latigazos de pincel que salen del punto de impacto
+            var blast = KenneyArt.Shape("effect_blast", _world, at, 1.1f * power, color, 19, keepColor: false);
+            StartCoroutine(Pop(blast, 0.3f));
             for (int i = 0; i < count; i++)
             {
                 Vector2 dir = Random.insideUnitCircle.normalized;
@@ -603,6 +581,22 @@ namespace ArrowBlaster
         {
             var lr = Brush.Dab("Drop", _world, at + Random.insideUnitCircle * 0.06f, Random.Range(0.06f, 0.14f), color, 7);
             StartCoroutine(Fade(lr, Vector2.down * Random.Range(0.1f, 0.5f), Random.Range(0.5f, 0.9f)));
+        }
+
+        private IEnumerator Pop(SpriteRenderer sr, float life)
+        {
+            float t = 0f;
+            Vector3 s0 = sr.transform.localScale;
+            Color c = sr.color;
+            while (t < life && sr != null)
+            {
+                t += Time.deltaTime;
+                float k = t / life;
+                sr.transform.localScale = s0 * (0.6f + 0.7f * Mathf.Sqrt(k));
+                sr.color = new Color(c.r, c.g, c.b, 1f - k);
+                yield return null;
+            }
+            if (sr != null) Destroy(sr.gameObject);
         }
 
         private IEnumerator Fade(LineRenderer lr, Vector2 v, float life)

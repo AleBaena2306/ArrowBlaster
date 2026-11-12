@@ -62,10 +62,15 @@ namespace ArrowBlaster
             root.SetParent(transform, false);
             root.position = r.center;
 
-            // Pincelada vertical de color que nace en el borde de la pantalla y se seca en el hueco
+            // Columna de Kenney (Scribble Platformer Expansion) repetida en vertical, en tinta,
+            // con una pincelada roja en el extremo que da al hueco (lo peligroso, en color)
+            var col = KenneyArt.Shape("column_middle", root, Vector2.zero, 1f, Cfg.ink, 6);
+            col.drawMode = SpriteDrawMode.Tiled;
+            col.transform.localScale = Vector3.one;
+            col.size = new Vector2(r.width * 128f / 88f, r.height);
             float h = r.height * 0.5f;
-            Vector2 gapEnd = new Vector2(0f, capAtBottom ? -h : h), farEnd = -gapEnd;
-            Brush.Line("Stroke", root, farEnd, gapEnd, r.width * 1.25f, Cfg.danger, 6, bend: 0.02f, dry: 0.9f);
+            float capY = capAtBottom ? -h + 0.12f : h - 0.12f;
+            Brush.Line("Cap", root, new Vector2(-r.width * 0.75f, capY), new Vector2(r.width * 0.75f, capY), 0.3f, Cfg.danger, 8, bend: 0.08f, dry: 0.8f);
             _parts.Add((root, r));
         }
 
@@ -88,7 +93,7 @@ namespace ArrowBlaster
     {
         private const float Radius = 0.6f;
         private float _fireTimer, _phase, _baseY;
-        private Transform _body, _pupilL, _pupilR;
+        private Transform _body;
 
         protected override void Build()
         {
@@ -96,10 +101,9 @@ namespace ArrowBlaster
             _phase = Random.value * 10f;
             _body = new GameObject("Enemy").transform;
             _body.SetParent(transform, false);
-            // Ensō de color y dos toques de tinta como ojos
-            Brush.Enso("Ring", _body, Vector2.zero, Radius * 0.85f, 0.32f, Cfg.enemy, 5, 340f);
-            _pupilL = Brush.Dab("EyeL", _body, new Vector2(-0.18f, 0.08f), 0.16f, Cfg.ink, 8).transform;
-            _pupilR = Brush.Dab("EyeR", _body, new Vector2(0.14f, 0.08f), 0.14f, Cfg.ink, 8).transform;
+            // Personaje redondo de Kenney (Scribble Platformer); conserva su color
+            string[] looks = { "character_roundRed", "character_roundGreen", "character_roundPurple", "character_roundYellow" };
+            KenneyArt.Shape(looks[Random.Range(0, looks.Length)], _body, Vector2.zero, Radius * 3.1f, Cfg.ink, 5, keepColor: true);
 
             _fireTimer = Cfg.enemyFireInterval * 0.5f;
         }
@@ -112,9 +116,6 @@ namespace ArrowBlaster
             transform.position = p;
             _body.localScale = new Vector3(1f + Mathf.Sin(_phase * 4.8f) * 0.04f, 1f - Mathf.Sin(_phase * 4.8f) * 0.04f, 1f);
 
-            Vector2 look = ((Vector2)Game.ArrowPosition - (Vector2)p).normalized * 0.06f;
-            _pupilL.localPosition = look;
-            _pupilR.localPosition = look;
 
             float ahead = p.x - Game.ArrowPosition.x;
             if (ahead < 1f || ahead > Cfg.enemyRange) return;
@@ -141,7 +142,8 @@ namespace ArrowBlaster
 
         protected override void Build()
         {
-            Brush.Line("Dash", transform, new Vector2(-Radius * 1.4f, 0f), new Vector2(Radius * 1.4f, 0f), Radius * 1.3f, Cfg.enemy, 7, bend: 0.1f, dry: 0.5f);
+            var shot = KenneyArt.Shape("effect_shot", transform, Vector2.zero, Radius * 5f, Cfg.ink, 7, keepColor: true);
+            shot.flipX = true; // la estela del disparo queda detrás (va hacia la izquierda)
         }
 
         public override void Tick(float dt)
@@ -178,7 +180,7 @@ namespace ArrowBlaster
                 var t = new GameObject("Target").transform;
                 t.SetParent(transform, false);
                 t.localPosition = new Vector2(i * 1.1f, dy);
-                Brush.Dab("Gold", t, Vector2.zero, Radius * 1.4f, Cfg.reward, 6);
+                KenneyArt.Shape("tile_coin", t, Vector2.zero, Radius * 4f, Cfg.ink, 6, keepColor: true);
                 _targets.Add(t);
             }
         }
