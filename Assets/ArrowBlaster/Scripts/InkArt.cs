@@ -2,13 +2,46 @@ using UnityEngine;
 
 namespace ArrowBlaster
 {
-    // Texturas de tinta generadas por código (papel, montañas a la aguada, trazos de pincel, manchas).
+    // Material de tinta y texturas generadas por código para la interfaz (papel, trazo de pincel, mancha, ensō).
     // Es arte procedural escrito a mano, no generado por IA; sustituible por texturas dibujadas si se quiere.
     public static class InkArt
     {
-        private static Material _spriteMaterial;
-        private static Sprite _paper, _ground, _stroke, _blob, _soft, _ring, _roundRect;
-        private static Sprite[] _mountains = new Sprite[3];
+        private static Material _spriteMaterial, _ink;
+        private static readonly int SeedId = Shader.PropertyToID("_Seed");
+        private static readonly int WorldId = Shader.PropertyToID("_WorldSpace");
+        private static readonly int DryId = Shader.PropertyToID("_Dry");
+
+        // Material del shader de tinta (Resources/ArrowBlasterInk.shader). Si no está disponible, sprites normales.
+        public static Material Ink
+        {
+            get
+            {
+                if (_ink != null) return _ink;
+                var shader = Resources.Load<Shader>("ArrowBlasterInk");
+                if (shader != null && shader.isSupported) _ink = new Material(shader) { name = "AB_Ink" };
+                else
+                {
+                    Debug.LogWarning("[ArrowBlaster] No se pudo cargar el shader de tinta; se usan sprites normales.");
+                    _ink = SpriteMaterial;
+                }
+                return _ink;
+            }
+        }
+
+        // Pone el material de tinta con una semilla propia, para que cada pincelada sea distinta.
+        // worldSpace: el ruido usa coordenadas del mundo (formas que siguen a la cámara, como el suelo).
+        // dry: cuánto pincel seco (null = el valor del material).
+        public static void Apply(Renderer r, bool worldSpace = false, float? dry = null)
+        {
+            r.sharedMaterial = Ink;
+            var mpb = new MaterialPropertyBlock();
+            r.GetPropertyBlock(mpb);
+            mpb.SetFloat(SeedId, Random.Range(0f, 100f));
+            mpb.SetFloat(WorldId, worldSpace ? 1f : 0f);
+            if (dry.HasValue) mpb.SetFloat(DryId, dry.Value);
+            r.SetPropertyBlock(mpb);
+        }
+        private static Sprite _paper, _stroke, _blob, _ring;
         private static Font _font;
 
         // Material por defecto de los sprites del proyecto (sirve también para LineRenderer y TrailRenderer)
@@ -94,67 +127,6 @@ namespace ArrowBlaster
             }
         }
 
-        // ───────── Montañas a la aguada (sumi-e) ─────────
-        // Cresta oscura que se difumina hacia abajo en niebla; se repite en horizontal.
-        public static Sprite Mountains(int index)
-        {
-            if (_mountains[index]) return _mountains[index];
-            const int w = 1024, h = 320;
-            float seed = 11f + index * 7.7f;
-            var tex = NewTex(w, h, TextureWrapMode.Clamp);
-            var px = new Color32[w * h];
-            for (int x = 0; x < w; x++)
-            {
-                float u = x / (float)w;
-                float ridge = Fbm(u, 3f + index, seed, 5) ;
-                ridge = Mathf.Pow(ridge, 1.6f);
-                float top = Mathf.Lerp(0.25f, 0.95f, ridge) * h;
-                for (int y = 0; y < h; y++)
-                {
-                    float a = 0f;
-                    if (y <= top)
-                    {
-                        float depth = (top - y) / Mathf.Max(1f, top);       // 0 en la cresta, 1 abajo
-                        float edge = Mathf.Clamp01((top - y) / 6f);          // borde suave
-                        float wash = Mathf.Lerp(1f, 0f, Mathf.SmoothStep(0f, 0.85f, depth));
-                        float bleed = Mathf.PerlinNoise(x * 0.02f + seed, y * 0.05f) * 0.35f;
-                        float dry = Mathf.PerlinNoise(x * 0.3f, y * 0.08f + seed) > 0.72f ? 0.75f : 1f;
-                        a = edge * Mathf.Clamp01(wash + bleed * wash) * dry;
-                    }
-                    byte g = (byte)(255 * a);
-                    px[y * w + x] = new Color32(255, 255, 255, g);
-                }
-            }
-            tex.SetPixels32(px);
-            return _mountains[index] = ToSprite(tex, new Vector2(0.5f, 0f), 64f);
-        }
-
-        // ───────── Suelo: trazo de tinta con borde irregular ─────────
-        public static Sprite Ground
-        {
-            get
-            {
-                if (_ground) return _ground;
-                const int w = 512, h = 160;
-                var tex = NewTex(w, h, TextureWrapMode.Clamp);
-                var px = new Color32[w * h];
-                for (int x = 0; x < w; x++)
-                {
-                    float u = x / (float)w;
-                    float edge = (0.72f + Fbm(u, 8f, 5f, 4) * 0.22f) * h;
-                    for (int y = 0; y < h; y++)
-                    {
-                        float a = Mathf.Clamp01((edge - y) / 3f);
-                        float streak = Mathf.PerlinNoise(x * 0.01f, y * 0.6f);
-                        if (y > edge - 18 && streak > 0.68f) a *= 0.55f; // pincel seco cerca del borde
-                        px[y * w + x] = new Color32(255, 255, 255, (byte)(255 * a));
-                    }
-                }
-                tex.SetPixels32(px);
-                return _ground = ToSprite(tex, new Vector2(0.5f, 1f), 64f);
-            }
-        }
-
         // ───────── Trazo de pincel horizontal (barras, botones, paredes) ─────────
         public static Sprite Stroke
         {
@@ -207,28 +179,6 @@ namespace ArrowBlaster
             }
         }
 
-        // Círculo de bordes suaves (brillos, sol, niebla)
-        public static Sprite Soft
-        {
-            get
-            {
-                if (_soft) return _soft;
-                const int s = 128;
-                var tex = NewTex(s, s, TextureWrapMode.Clamp);
-                var px = new Color32[s * s];
-                for (int y = 0; y < s; y++)
-                    for (int x = 0; x < s; x++)
-                    {
-                        float dx = (x - s * 0.5f + 0.5f) / (s * 0.5f), dy = (y - s * 0.5f + 0.5f) / (s * 0.5f);
-                        float d = Mathf.Sqrt(dx * dx + dy * dy);
-                        float a = Mathf.Clamp01((1f - d) * 24f);
-                        px[y * s + x] = new Color32(255, 255, 255, (byte)(255 * a));
-                    }
-                tex.SetPixels32(px);
-                return _soft = ToSprite(tex, new Vector2(0.5f, 0.5f), s);
-            }
-        }
-
         // Anillo de tinta tipo ensō (pincelada circular que no se cierra del todo)
         public static Sprite Ring
         {
@@ -257,30 +207,5 @@ namespace ArrowBlaster
             }
         }
 
-        // Rectángulo redondeado con borde algo irregular (pilares, paneles)
-        public static Sprite RoundRect
-        {
-            get
-            {
-                if (_roundRect) return _roundRect;
-                const int s = 64;
-                var tex = NewTex(s, s, TextureWrapMode.Clamp);
-                var px = new Color32[s * s];
-                const float r = 14f;
-                for (int y = 0; y < s; y++)
-                    for (int x = 0; x < s; x++)
-                    {
-                        float qx = Mathf.Max(Mathf.Abs(x - s * 0.5f + 0.5f) - (s * 0.5f - r), 0f);
-                        float qy = Mathf.Max(Mathf.Abs(y - s * 0.5f + 0.5f) - (s * 0.5f - r), 0f);
-                        float d = Mathf.Sqrt(qx * qx + qy * qy) - r + Mathf.PerlinNoise(x * 0.3f, y * 0.3f) * 1.5f;
-                        float a = Mathf.Clamp01(-d);
-                        px[y * s + x] = new Color32(255, 255, 255, (byte)(255 * a));
-                    }
-                tex.SetPixels32(px);
-                // Bordes de 9-slice para poder estirarlo sin deformar las esquinas
-                tex.Apply(false, true);
-                return _roundRect = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s, 0, SpriteMeshType.FullRect, new Vector4(r, r, r, r));
-            }
-        }
     }
 }

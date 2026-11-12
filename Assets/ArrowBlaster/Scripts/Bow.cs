@@ -65,7 +65,7 @@ namespace ArrowBlaster
             var lr = go.AddComponent<LineRenderer>();
             lr.useWorldSpace = false;
             lr.positionCount = points;
-            lr.sharedMaterial = InkArt.SpriteMaterial;
+            InkArt.Apply(lr, dry: 0.5f);
             lr.startColor = lr.endColor = color;
             lr.numCapVertices = 4;
             lr.numCornerVertices = 2;

@@ -482,7 +482,7 @@ namespace ArrowBlaster
             _aimDots.Clear();
             for (int i = 0; i < 16; i++)
             {
-                var d = Gfx.Shape("AimDot", InkArt.Blob, _world, Vector2.zero, Vector2.one * 0.16f, Config.inkSoft, 15);
+                var d = Gfx.Shape("AimDot", Gfx.Circle, _world, Vector2.zero, Vector2.one * 0.16f, Config.inkSoft, 15);
                 d.enabled = false;
                 _aimDots.Add(d);
             }
@@ -507,7 +507,7 @@ namespace ArrowBlaster
 
             _arrowParts = _arrow.GetComponentsInChildren<SpriteRenderer>();
             _trail = _arrow.gameObject.AddComponent<TrailRenderer>();
-            _trail.sharedMaterial = InkArt.SpriteMaterial;
+            InkArt.Apply(_trail, dry: 1f);
             _trail.time = 0.4f;
             _trail.minVertexDistance = 0.05f;
             _trail.numCapVertices = 3;
@@ -565,11 +565,11 @@ namespace ArrowBlaster
             for (int i = 0; i < count; i++)
             {
                 float size = Random.Range(0.12f, 0.42f) * power;
-                var sr = Gfx.Shape("Ink", InkArt.Blob, _world, at, Vector2.one * size, color, 20);
+                var sr = Gfx.Shape("Ink", Gfx.Circle, _world, at, Vector2.one * size, color, 20);
                 sr.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
                 StartCoroutine(Fade(sr, Random.insideUnitCircle.normalized * Random.Range(2f, 7f) * power, Random.Range(0.35f, 0.65f)));
             }
-            var stain = Gfx.Shape("Stain", InkArt.Blob, _world, at, Vector2.one * 0.9f * power, new Color(color.r, color.g, color.b, 0.55f), 3);
+            var stain = Gfx.Shape("Stain", Gfx.Circle, _world, at, Vector2.one * 0.9f * power, new Color(color.r, color.g, color.b, 0.55f), 3);
             stain.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
             StartCoroutine(Fade(stain, Vector2.zero, 1.4f));
         }
@@ -577,7 +577,7 @@ namespace ArrowBlaster
         // Gota de tinta que deja la flecha al volar
         private void Drop(Vector2 at, Color color)
         {
-            var sr = Gfx.Shape("Drop", InkArt.Blob, _world, at + Random.insideUnitCircle * 0.06f, Vector2.one * Random.Range(0.07f, 0.16f),
+            var sr = Gfx.Shape("Drop", Gfx.Circle, _world, at + Random.insideUnitCircle * 0.06f, Vector2.one * Random.Range(0.07f, 0.16f),
                 new Color(color.r, color.g, color.b, 0.7f), 7);
             StartCoroutine(Fade(sr, Vector2.down * Random.Range(0.1f, 0.5f), Random.Range(0.5f, 0.9f)));
         }

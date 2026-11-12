@@ -36,18 +36,16 @@ namespace ArrowBlaster
             return (a - b).sqrMagnitude <= d * d;
         }
 
-        // Cuerpo de color con contorno de tinta
-        protected SpriteRenderer InkedBlob(Transform parent, Vector2 pos, float size, Color color, int order)
+        // Mancha redonda de color (el shader de tinta le da el borde irregular)
+        protected SpriteRenderer Dab(Transform parent, Vector2 pos, float size, Color color, int order)
         {
-            var outline = Gfx.Shape("Outline", InkArt.Blob, parent, pos, Vector2.one * size * 1.18f, Cfg.ink, order);
-            outline.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
-            var body = Gfx.Shape("Body", InkArt.Blob, parent, pos, Vector2.one * size, color, order + 1);
+            var body = Gfx.Shape("Body", Gfx.Circle, parent, pos, Vector2.one * size, color, order);
             body.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
             return body;
         }
     }
 
-    // Pilares lacados (como los de un torii) con un hueco: hay que pasar por el hueco o romperlos atacando.
+    // Dos trazos verticales de color con un hueco: hay que pasar por el hueco o romperlos atacando.
     public sealed class WallGap : Obstacle
     {
         public float GapCenter;
@@ -70,14 +68,10 @@ namespace ArrowBlaster
             root.SetParent(transform, false);
             root.position = r.center;
 
-            Gfx.Sliced("Outline", InkArt.RoundRect, root, Vector2.zero, r.size + new Vector2(0.16f, 0.16f), Cfg.ink, 5);
-            Gfx.Sliced("Lacquer", InkArt.RoundRect, root, Vector2.zero, r.size, Cfg.danger, 6);
-            // Brillo de laca
-            Gfx.Sliced("Shine", InkArt.RoundRect, root, new Vector2(-r.width * 0.22f, 0f), new Vector2(r.width * 0.16f, r.height - 0.3f), new Color(1f, 1f, 1f, 0.18f), 7);
-            // Remate negro en el extremo que da al hueco (kasagi)
-            float capY = (capAtBottom ? -1f : 1f) * (r.height * 0.5f - 0.12f);
-            var cap = Gfx.Shape("Cap", InkArt.Stroke, root, new Vector2(0f, capY), new Vector2(r.width + 0.9f, 0.42f), Cfg.ink, 8);
-            if (capAtBottom) cap.flipY = true;
+            // Trazo de color (vertical) y remate de tinta en el extremo que da al hueco
+            Gfx.Shape("Stroke", Gfx.Square, root, Vector2.zero, r.size, Cfg.danger, 6);
+            float capY = (capAtBottom ? -1f : 1f) * (r.height * 0.5f - 0.1f);
+            Gfx.Shape("Cap", Gfx.Square, root, new Vector2(0f, capY), new Vector2(r.width + 0.7f, 0.26f), Cfg.ink, 8);
             _parts.Add((root, r));
         }
 
@@ -95,7 +89,7 @@ namespace ArrowBlaster
         }
     }
 
-    // Pequeño oni de tinta y color que dispara bolas hacia la flecha.
+    // Mancha de color con ojos y cuernos de tinta (un pequeño oni) que dispara bolas hacia la flecha.
     public sealed class Enemy : Obstacle
     {
         private const float Radius = 0.6f;
@@ -115,7 +109,7 @@ namespace ArrowBlaster
             var hornR = Gfx.Shape("HornR", Gfx.Triangle, _body, new Vector2(0.28f, 0.62f), new Vector2(0.34f, 0.2f), Cfg.ink, 4);
             hornR.transform.localRotation = Quaternion.Euler(0, 0, 70f);
 
-            InkedBlob(_body, Vector2.zero, Radius * 2f, Cfg.enemy, 5);
+            Dab(_body, Vector2.zero, Radius * 2f, Cfg.enemy, 5);
 
             // Ojos que siguen a la flecha
             Gfx.Shape("EyeL", Gfx.Circle, _body, new Vector2(-0.2f, 0.12f), Vector2.one * 0.3f, Cfg.paper, 8);
@@ -123,7 +117,7 @@ namespace ArrowBlaster
             _pupilL = Gfx.Shape("PupilL", Gfx.Circle, _body, new Vector2(-0.2f, 0.12f), Vector2.one * 0.13f, Cfg.ink, 9).transform;
             _pupilR = Gfx.Shape("PupilR", Gfx.Circle, _body, new Vector2(0.14f, 0.12f), Vector2.one * 0.12f, Cfg.ink, 9).transform;
             // Boca
-            Gfx.Shape("Mouth", InkArt.Stroke, _body, new Vector2(-0.04f, -0.22f), new Vector2(0.42f, 0.1f), Cfg.ink, 8);
+            Gfx.Shape("Mouth", Gfx.Square, _body, new Vector2(-0.04f, -0.22f), new Vector2(0.4f, 0.08f), Cfg.ink, 8);
 
             _fireTimer = Cfg.enemyFireInterval * 0.5f;
         }
@@ -165,8 +159,7 @@ namespace ArrowBlaster
 
         protected override void Build()
         {
-            InkedBlob(transform, Vector2.zero, Radius * 2.2f, Cfg.enemy, 7);
-            Gfx.Shape("Shine", Gfx.Circle, transform, new Vector2(-0.07f, 0.07f), Vector2.one * 0.12f, new Color(1f, 1f, 1f, 0.6f), 10);
+            Dab(transform, Vector2.zero, Radius * 2.2f, Cfg.enemy, 7);
         }
 
         public override void Tick(float dt)

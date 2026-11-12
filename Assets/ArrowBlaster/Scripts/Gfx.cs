@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace ArrowBlaster
 {
-    // Formas de prueba (bloques grises) generadas por código. Se sustituyen por el arte definitivo el día 4.
+    // Formas simples generadas por código (cuadrado, círculo, triángulo). El shader de tinta las convierte en pinceladas.
     public static class Gfx
     {
         private static Sprite _square, _circle, _triangle;
@@ -35,16 +35,7 @@ namespace ArrowBlaster
             tex.SetPixels32(px);
             tex.Apply(false, true);
             // pixelsPerUnit = size: cada forma mide 1 × 1 unidad y se escala con transform.localScale
-            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
-        }
-
-        // Sprite de 9-slice estirado sin deformar las esquinas (p. ej. InkArt.RoundRect)
-        public static SpriteRenderer Sliced(string name, Sprite sprite, Transform parent, Vector2 pos, Vector2 size, Color color, int order)
-        {
-            var sr = Shape(name, sprite, parent, pos, Vector2.one, color, order);
-            sr.drawMode = SpriteDrawMode.Sliced;
-            sr.size = size;
-            return sr;
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size, 0, SpriteMeshType.FullRect);
         }
 
         public static SpriteRenderer Shape(string name, Sprite sprite, Transform parent, Vector2 pos, Vector2 size, Color color, int order)
@@ -57,6 +48,7 @@ namespace ArrowBlaster
             sr.sprite = sprite;
             sr.color = color;
             sr.sortingOrder = order;
+            InkArt.Apply(sr);
             return sr;
         }
     }
