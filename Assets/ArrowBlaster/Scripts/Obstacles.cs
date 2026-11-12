@@ -222,11 +222,11 @@ namespace ArrowBlaster
         {
             int count = Random.Range(4, 8);
             bool arc = Random.value < 0.5f;
+            bool good = Random.value >= Cfg.badPickupChance; // todo el grupo es bueno o todo malo
             for (int i = 0; i < count; i++)
             {
                 float k = i / (float)(count - 1);
                 float dy = arc ? Mathf.Sin(k * Mathf.PI) * 1.6f - 0.6f : (k - 0.5f) * Random.Range(-2f, 2f);
-                bool good = Random.value >= Cfg.badPickupChance;
                 var t = new GameObject(good ? "Good" : "Bad").transform;
                 t.SetParent(transform, false);
                 t.localPosition = new Vector2(i * 1.05f, dy);
@@ -239,6 +239,7 @@ namespace ArrowBlaster
         public override void Tick(float dt)
         {
             _phase += dt;
+            transform.position += Vector3.left * (Cfg.pickupDriftSpeed * dt); // vienen hacia la flecha
             for (int i = 0; i < _items.Count; i++)
             {
                 var t = _items[i].t;

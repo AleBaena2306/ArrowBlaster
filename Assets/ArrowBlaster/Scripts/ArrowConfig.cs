@@ -106,13 +106,15 @@ namespace ArrowBlaster
         [Header("Partículas de impulso (como en Burrito Bison)")]
         [Tooltip("Probabilidad relativa de un grupo de partículas frente a pared, enemigo y monedas.")]
         public float pickupsWeight = 3f;
-        [Tooltip("Proporción de partículas malas (frenan).")]
+        [Tooltip("Proporción de grupos de partículas malos (frenan); cada grupo es todo bueno o todo malo.")]
         [Range(0f, 1f)] public float badPickupChance = 0.3f;
         [Tooltip("Fuerza que da una partícula buena y quita una mala.")]
         public float pickupForce = 9f;
         [Tooltip("Segundos de acelerón tras una partícula buena.")]
         public float pickupBoostTime = 0.6f;
         public float pickupBoostMultiplier = 1.3f;
+        [Tooltip("Velocidad a la que las partículas avanzan hacia la izquierda, contra la flecha.")]
+        public float pickupDriftSpeed = 3f;
 
         [Header("Zonas y jefes")]
         [Tooltip("Distancia hasta el jefe de cada zona (metros).")]
