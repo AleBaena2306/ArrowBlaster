@@ -34,7 +34,8 @@ namespace ArrowBlaster
         private int _zone;
         private Boss _boss;
         private bool _bossDone;
-        private float _boostTime;
+        private float _attackTimer, _attackCooldown;
+        private bool _attackSpent;
         private float ZoneLength => Config.zoneLengths[Mathf.Clamp(_zone, 0, Config.zoneLengths.Length - 1)];
         private readonly List<Obstacle> _obstacles = new List<Obstacle>();
         private float _nextSpawnX;
@@ -98,7 +99,8 @@ namespace ArrowBlaster
             _zone = Mathf.Clamp(Save.Zone, 0, Config.zoneLengths.Length - 1);
             _boss = null;
             _bossDone = false;
-            _boostTime = 0f;
+            _attackTimer = _attackCooldown = 0f;
+            _attackSpent = false;
             _state = State.Aim;
             _hud.ShowRun(_lives);
             _hud.SetHint("Drag back to aim · Release to shoot");
@@ -302,23 +304,35 @@ namespace ArrowBlaster
 
         // Atacar: la flecha va en línea recta y más rápida, pero gasta fuerza a cada segundo
         private float Speed() => (Config.minSpeed + _force * Config.speedPerForce) * Upgrades.SpeedMultiplier
-                                 * (_attacking ? Config.attackSpeedMultiplier : 1f)
-                                 * (_boostTime > 0f ? Config.pickupBoostMultiplier : 1f);
+                                 * (_attacking ? Config.attackSpeedMultiplier : 1f);
 
         private void UpdateFlight(float dt)
         {
             // Entrada: tocar = impulso; mantener = atacar (planeo)
-            // Tocar (soltar antes del umbral) = impulso; mantener = atacar sin subir antes
+            // Tocar (soltar antes del umbral) = impulso. Mantener = un golpe de duración fija;
+            // para dar otro hay que soltar y esperar un momento.
             if (_releasedThisFrame && _holdTime < Config.holdThreshold) _vel.y = Config.flapVelocity;
             if (_pressedThisFrame) _holdTime = 0f;
-            if (_pressed) _holdTime += dt; else _holdTime = 0f;
-            _attacking = _pressed && _holdTime >= Config.holdThreshold;
+            if (_pressed) _holdTime += dt; else { _holdTime = 0f; _attackSpent = false; }
+            if (_attackCooldown > 0f) _attackCooldown -= dt;
+            if (_attackTimer > 0f)
+            {
+                _attackTimer -= dt;
+                if (_attackTimer <= 0f) _attackCooldown = Config.attackCooldown;
+            }
+            else if (_pressed && !_attackSpent && _attackCooldown <= 0f && _holdTime >= Config.holdThreshold)
+            {
+                _attackTimer = Config.attackDuration;
+                _attackSpent = true;
+                _force = Mathf.Max(0f, _force - Config.attackForceCost * Upgrades.AttackCostMultiplier);
+                _shake = Mathf.Max(_shake, 0.08f);
+            }
+            _attacking = _attackTimer > 0f;
 
             if (_attacking) _vel.y = Mathf.MoveTowards(_vel.y, 0f, 60f * dt); // línea recta
             else _vel.y -= Config.gravity * dt;
 
             float drain = Config.forceDecayPerSecond * Upgrades.DecayMultiplier;
-            if (_attacking) drain += Config.attackDrainPerSecond * Upgrades.AttackCostMultiplier;
             _force = Mathf.Max(0f, _force - drain * dt);
             _vel.x = Speed();
             _pos += _vel * dt;
@@ -332,7 +346,6 @@ namespace ArrowBlaster
             }
 
             if (_invulnerable > 0f) _invulnerable -= dt;
-            if (_boostTime > 0f) _boostTime -= dt;
 
             _dropTimer -= dt;
             if (_dropTimer <= 0f)
@@ -469,13 +482,11 @@ namespace ArrowBlaster
             if (good)
             {
                 _force = Mathf.Min(Config.maxForce, _force + Config.pickupForce);
-                _boostTime = Config.pickupBoostTime;
                 Splash(at, Config.reward, 4, 0.5f);
             }
             else
             {
                 _force = Mathf.Max(0f, _force - Config.pickupForce);
-                _boostTime = 0f;
                 Splash(at, Config.ink, 5, 0.6f);
                 _shake = Mathf.Max(_shake, 0.12f);
             }

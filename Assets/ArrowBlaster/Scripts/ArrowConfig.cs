@@ -61,8 +61,12 @@ namespace ArrowBlaster
         public float speedPerForce = 0.08f;
         [Tooltip("Fuerza que se pierde por segundo de vuelo.")]
         public float forceDecayPerSecond = 3.5f;
-        [Tooltip("Fuerza que se gasta por segundo mientras se ataca.")]
-        public float attackDrainPerSecond = 14f;
+        [Tooltip("Fuerza que cuesta cada golpe (embestida).")]
+        public float attackForceCost = 6f;
+        [Tooltip("Duración de cada golpe en segundos; mantener pulsado más tiempo no lo alarga.")]
+        public float attackDuration = 0.35f;
+        [Tooltip("Espera tras un golpe antes de poder dar otro (además de soltar).")]
+        public float attackCooldown = 0.2f;
         [Tooltip("Velocidad horizontal mientras se ataca (multiplicador); la flecha va en línea recta.")]
         public float attackSpeedMultiplier = 1.7f;
         [Tooltip("Fuerza que cuesta romper un obstáculo atacando.")]
@@ -110,9 +114,6 @@ namespace ArrowBlaster
         [Range(0f, 1f)] public float badPickupChance = 0.3f;
         [Tooltip("Fuerza que da una partícula buena y quita una mala.")]
         public float pickupForce = 9f;
-        [Tooltip("Segundos de acelerón tras una partícula buena.")]
-        public float pickupBoostTime = 0.6f;
-        public float pickupBoostMultiplier = 1.3f;
         [Tooltip("Velocidad a la que las partículas avanzan hacia la izquierda, contra la flecha.")]
         public float pickupDriftSpeed = 3f;
 
@@ -129,8 +130,8 @@ namespace ArrowBlaster
         public float bossFireInterval = 1.3f;
         [Tooltip("Distancia a la que el jefe espera por delante de la flecha.")]
         public float bossDistance = 8f;
-        [Tooltip("Velocidad a la que la flecha se acerca al jefe mientras ataca.")]
-        public float bossChargeSpeed = 9f;
+        [Tooltip("Velocidad a la que la flecha se acerca al jefe durante un golpe.")]
+        public float bossChargeSpeed = 22f;
 
         [Header("Monedas")]
         public float coinsPerMeter = 0.1f;
