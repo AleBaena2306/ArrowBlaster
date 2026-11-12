@@ -38,6 +38,15 @@ namespace ArrowBlaster
             return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
         }
 
+        // Sprite de 9-slice estirado sin deformar las esquinas (p. ej. InkArt.RoundRect)
+        public static SpriteRenderer Sliced(string name, Sprite sprite, Transform parent, Vector2 pos, Vector2 size, Color color, int order)
+        {
+            var sr = Shape(name, sprite, parent, pos, Vector2.one, color, order);
+            sr.drawMode = SpriteDrawMode.Sliced;
+            sr.size = size;
+            return sr;
+        }
+
         public static SpriteRenderer Shape(string name, Sprite sprite, Transform parent, Vector2 pos, Vector2 size, Color color, int order)
         {
             var go = new GameObject(name);

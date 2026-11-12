@@ -5,9 +5,10 @@ namespace ArrowBlaster
 {
     // Obstáculos del vuelo. Sin físicas de Unity: cada uno comprueba a mano si la punta de la flecha lo toca.
     // Reglas:
-    //  - Chocar sin atacar: quita una vida (paredes, enemigos, proyectiles).
+    //  - Chocar sin atacar: quita una vida (pilares, enemigos, proyectiles).
     //  - Chocar atacando: rompe lo que toca y cuesta fuerza.
     //  - Las dianas pequeñas no hacen daño: solo se rompen atacando y dan monedas.
+    // Estilo: tinta negra sobre papel; lo peligroso, en color.
     public abstract class Obstacle : MonoBehaviour
     {
         protected ArrowGame Game;
@@ -18,7 +19,7 @@ namespace ArrowBlaster
         public void Init(ArrowGame game) { Game = game; Build(); }
         protected abstract void Build();
         public virtual void Tick(float dt) { }
-        // Devuelve true si el obstáculo ya no existe (se ha roto entero o ha salido de la pantalla)
+        // Devuelve true si el obstáculo ya no existe (se ha roto entero)
         public abstract bool CheckHit(Vector2 tip, float radius, bool attacking);
 
         protected static bool CircleRect(Vector2 c, float r, Rect rect)
@@ -34,13 +35,23 @@ namespace ArrowBlaster
             float d = ra + rb;
             return (a - b).sqrMagnitude <= d * d;
         }
+
+        // Cuerpo de color con contorno de tinta
+        protected SpriteRenderer InkedBlob(Transform parent, Vector2 pos, float size, Color color, int order)
+        {
+            var outline = Gfx.Shape("Outline", InkArt.Blob, parent, pos, Vector2.one * size * 1.18f, Cfg.ink, order);
+            outline.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
+            var body = Gfx.Shape("Body", InkArt.Blob, parent, pos, Vector2.one * size, color, order + 1);
+            body.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
+            return body;
+        }
     }
 
-    // Pared con un hueco: hay que pasar por el hueco o romperla atacando.
+    // Pilares lacados (como los de un torii) con un hueco: hay que pasar por el hueco o romperlos atacando.
     public sealed class WallGap : Obstacle
     {
         public float GapCenter;
-        private readonly List<(SpriteRenderer sr, Rect rect)> _parts = new List<(SpriteRenderer, Rect)>();
+        private readonly List<(Transform root, Rect rect)> _parts = new List<(Transform, Rect)>();
 
         public override float RightEdge => transform.position.x + Cfg.wallWidth;
 
@@ -48,15 +59,26 @@ namespace ArrowBlaster
         {
             float x = transform.position.x, w = Cfg.wallWidth;
             float gapTop = GapCenter + Cfg.gapHeight * 0.5f, gapBottom = GapCenter - Cfg.gapHeight * 0.5f;
-            AddPart(new Rect(x - w * 0.5f, gapTop, w, Cfg.ceilingY + 2f - gapTop));
-            AddPart(new Rect(x - w * 0.5f, Cfg.groundY - 2f, w, gapBottom - (Cfg.groundY - 2f)));
+            AddPart(new Rect(x - w * 0.5f, gapTop, w, Cfg.ceilingY + 3f - gapTop), capAtBottom: true);
+            AddPart(new Rect(x - w * 0.5f, Cfg.groundY - 1f, w, gapBottom - (Cfg.groundY - 1f)), capAtBottom: false);
         }
 
-        private void AddPart(Rect r)
+        private void AddPart(Rect r, bool capAtBottom)
         {
             if (r.height <= 0.05f) return;
-            var sr = Gfx.Shape("Wall", Gfx.Square, transform, r.center - (Vector2)transform.position, r.size, Cfg.danger, 5);
-            _parts.Add((sr, r));
+            var root = new GameObject("Pillar").transform;
+            root.SetParent(transform, false);
+            root.position = r.center;
+
+            Gfx.Sliced("Outline", InkArt.RoundRect, root, Vector2.zero, r.size + new Vector2(0.16f, 0.16f), Cfg.ink, 5);
+            Gfx.Sliced("Lacquer", InkArt.RoundRect, root, Vector2.zero, r.size, Cfg.danger, 6);
+            // Brillo de laca
+            Gfx.Sliced("Shine", InkArt.RoundRect, root, new Vector2(-r.width * 0.22f, 0f), new Vector2(r.width * 0.16f, r.height - 0.3f), new Color(1f, 1f, 1f, 0.18f), 7);
+            // Remate negro en el extremo que da al hueco (kasagi)
+            float capY = (capAtBottom ? -1f : 1f) * (r.height * 0.5f - 0.12f);
+            var cap = Gfx.Shape("Cap", InkArt.Stroke, root, new Vector2(0f, capY), new Vector2(r.width + 0.9f, 0.42f), Cfg.ink, 8);
+            if (capAtBottom) cap.flipY = true;
+            _parts.Add((root, r));
         }
 
         public override bool CheckHit(Vector2 tip, float radius, bool attacking)
@@ -66,34 +88,65 @@ namespace ArrowBlaster
                 if (!CircleRect(tip, radius, _parts[i].rect)) continue;
                 if (attacking) Game.Break(tip, Cfg.breakForceCost, Cfg.coinsPerWall, Cfg.danger);
                 else Game.Damage(tip);
-                Destroy(_parts[i].sr.gameObject);
+                Destroy(_parts[i].root.gameObject);
                 _parts.RemoveAt(i);
             }
             return _parts.Count == 0;
         }
     }
 
-    // Enemigo de color que dispara proyectiles hacia la flecha.
+    // Pequeño oni de tinta y color que dispara bolas hacia la flecha.
     public sealed class Enemy : Obstacle
     {
         private const float Radius = 0.6f;
-        private float _fireTimer;
+        private float _fireTimer, _phase, _baseY;
+        private Transform _body, _pupilL, _pupilR;
 
         protected override void Build()
         {
-            Gfx.Shape("Body", Gfx.Circle, transform, Vector2.zero, Vector2.one * Radius * 2f, Cfg.enemy, 5);
-            Gfx.Shape("Eye", Gfx.Circle, transform, new Vector2(-0.2f, 0.15f), Vector2.one * 0.28f, Cfg.paper, 6);
+            _baseY = transform.position.y;
+            _phase = Random.value * 10f;
+            _body = new GameObject("Oni").transform;
+            _body.SetParent(transform, false);
+
+            // Cuernos
+            var hornL = Gfx.Shape("HornL", Gfx.Triangle, _body, new Vector2(-0.28f, 0.62f), new Vector2(0.34f, 0.2f), Cfg.ink, 4);
+            hornL.transform.localRotation = Quaternion.Euler(0, 0, 110f);
+            var hornR = Gfx.Shape("HornR", Gfx.Triangle, _body, new Vector2(0.28f, 0.62f), new Vector2(0.34f, 0.2f), Cfg.ink, 4);
+            hornR.transform.localRotation = Quaternion.Euler(0, 0, 70f);
+
+            InkedBlob(_body, Vector2.zero, Radius * 2f, Cfg.enemy, 5);
+
+            // Ojos que siguen a la flecha
+            Gfx.Shape("EyeL", Gfx.Circle, _body, new Vector2(-0.2f, 0.12f), Vector2.one * 0.3f, Cfg.paper, 8);
+            Gfx.Shape("EyeR", Gfx.Circle, _body, new Vector2(0.14f, 0.12f), Vector2.one * 0.26f, Cfg.paper, 8);
+            _pupilL = Gfx.Shape("PupilL", Gfx.Circle, _body, new Vector2(-0.2f, 0.12f), Vector2.one * 0.13f, Cfg.ink, 9).transform;
+            _pupilR = Gfx.Shape("PupilR", Gfx.Circle, _body, new Vector2(0.14f, 0.12f), Vector2.one * 0.12f, Cfg.ink, 9).transform;
+            // Boca
+            Gfx.Shape("Mouth", InkArt.Stroke, _body, new Vector2(-0.04f, -0.22f), new Vector2(0.42f, 0.1f), Cfg.ink, 8);
+
             _fireTimer = Cfg.enemyFireInterval * 0.5f;
         }
 
         public override void Tick(float dt)
         {
-            float ahead = transform.position.x - Game.ArrowPosition.x;
+            _phase += dt;
+            var p = transform.position;
+            p.y = _baseY + Mathf.Sin(_phase * 2.4f) * 0.25f;
+            transform.position = p;
+            _body.localScale = new Vector3(1f + Mathf.Sin(_phase * 4.8f) * 0.04f, 1f - Mathf.Sin(_phase * 4.8f) * 0.04f, 1f);
+
+            Vector2 look = ((Vector2)Game.ArrowPosition - (Vector2)p).normalized * 0.06f;
+            _pupilL.localPosition = new Vector2(-0.2f, 0.12f) + look;
+            _pupilR.localPosition = new Vector2(0.14f, 0.12f) + look;
+
+            float ahead = p.x - Game.ArrowPosition.x;
             if (ahead < 1f || ahead > Cfg.enemyRange) return;
             _fireTimer -= dt;
             if (_fireTimer > 0f) return;
             _fireTimer = Cfg.enemyFireInterval;
-            Game.Spawn<Projectile>("Projectile", (Vector2)transform.position + Vector2.left * Radius);
+            _body.localScale = new Vector3(1.2f, 0.85f, 1f);
+            Game.Spawn<Projectile>("Projectile", (Vector2)p + Vector2.left * Radius);
         }
 
         public override bool CheckHit(Vector2 tip, float radius, bool attacking)
@@ -112,12 +165,14 @@ namespace ArrowBlaster
 
         protected override void Build()
         {
-            Gfx.Shape("Ball", Gfx.Circle, transform, Vector2.zero, Vector2.one * Radius * 2f, Cfg.enemy, 7);
+            InkedBlob(transform, Vector2.zero, Radius * 2.2f, Cfg.enemy, 7);
+            Gfx.Shape("Shine", Gfx.Circle, transform, new Vector2(-0.07f, 0.07f), Vector2.one * 0.12f, new Color(1f, 1f, 1f, 0.6f), 10);
         }
 
         public override void Tick(float dt)
         {
             transform.position += Vector3.left * (Cfg.projectileSpeed * dt);
+            transform.Rotate(0f, 0f, 200f * dt);
         }
 
         public override bool CheckHit(Vector2 tip, float radius, bool attacking)
@@ -129,13 +184,14 @@ namespace ArrowBlaster
         }
     }
 
-    // Grupo de dianas pequeñas: no hacen daño; romperlas atacando da monedas.
+    // Grupo de dianas pequeñas (mato): no hacen daño; romperlas atacando da monedas.
     public sealed class TargetCluster : Obstacle
     {
         private const float Radius = 0.38f;
         private readonly List<Transform> _targets = new List<Transform>();
+        private float _phase;
 
-        public override float RightEdge => transform.position.x + 4f;
+        public override float RightEdge => transform.position.x + 5f;
 
         protected override void Build()
         {
@@ -147,11 +203,19 @@ namespace ArrowBlaster
                 var t = new GameObject("Target").transform;
                 t.SetParent(transform, false);
                 t.localPosition = new Vector2(i * 1.1f, dy);
-                Gfx.Shape("Ring", Gfx.Circle, t, Vector2.zero, Vector2.one * Radius * 2f, Cfg.reward, 5);
-                Gfx.Shape("Inner", Gfx.Circle, t, Vector2.zero, Vector2.one * Radius * 1.2f, Cfg.paper, 6);
-                Gfx.Shape("Dot", Gfx.Circle, t, Vector2.zero, Vector2.one * Radius * 0.5f, Cfg.reward, 7);
+                Gfx.Shape("Ink", Gfx.Circle, t, Vector2.zero, Vector2.one * Radius * 2f, Cfg.ink, 5);
+                Gfx.Shape("Paper", Gfx.Circle, t, Vector2.zero, Vector2.one * Radius * 1.5f, Cfg.paper, 6);
+                Gfx.Shape("Ring", Gfx.Circle, t, Vector2.zero, Vector2.one * Radius * 1.05f, Cfg.ink, 7);
+                Gfx.Shape("Gold", Gfx.Circle, t, Vector2.zero, Vector2.one * Radius * 0.7f, Cfg.reward, 8);
                 _targets.Add(t);
             }
+        }
+
+        public override void Tick(float dt)
+        {
+            _phase += dt;
+            for (int i = 0; i < _targets.Count; i++)
+                _targets[i].localScale = Vector3.one * (1f + Mathf.Sin(_phase * 5f + i) * 0.06f);
         }
 
         public override bool CheckHit(Vector2 tip, float radius, bool attacking)

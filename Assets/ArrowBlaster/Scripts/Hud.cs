@@ -28,7 +28,7 @@ namespace ArrowBlaster
         {
             _game = game;
             _cfg = cfg;
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _font = InkArt.Font;
 
             var canvasGo = new GameObject("HUD");
             var canvas = canvasGo.AddComponent<Canvas>();
@@ -46,25 +46,30 @@ namespace ArrowBlaster
 
         private void Build()
         {
-            // Barra de fuerza (arriba a la izquierda)
-            var bar = Box("ForceBar", _root, new Vector2(0, 1), new Vector2(60, -60), new Vector2(520, 44), _cfg.ink);
-            var inner = Box("Inner", bar, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(508, 32), _cfg.paper);
-            _forceFill = Box("Fill", inner, new Vector2(0, 0.5f), Vector2.zero, new Vector2(508, 32), _cfg.ink).GetComponent<Image>();
-            _forceFill.rectTransform.pivot = new Vector2(0, 0.5f);
-            Label("ForceLabel", bar, new Vector2(0, 0), new Vector2(0, -34), new Vector2(200, 30), "FORCE", 18, 24, TextAnchor.MiddleLeft, _cfg.ink)
+            // Barra de fuerza (arriba a la izquierda): trazo de pincel que se vacía
+            var bar = Box("ForceBar", _root, new Vector2(0, 1), new Vector2(60, -70), new Vector2(540, 64), new Color(_cfg.ink.r, _cfg.ink.g, _cfg.ink.b, 0.18f));
+            bar.GetComponent<Image>().sprite = InkArt.Stroke;
+            _forceFill = Box("Fill", bar, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(540, 64), _cfg.ink).GetComponent<Image>();
+            _forceFill.sprite = InkArt.Stroke;
+            _forceFill.type = Image.Type.Filled;
+            _forceFill.fillMethod = Image.FillMethod.Horizontal;
+            _forceFill.fillOrigin = (int)Image.OriginHorizontal.Left;
+            Label("ForceLabel", bar, new Vector2(0, 0), new Vector2(6, -6), new Vector2(220, 36), "FORCE", 18, 30, TextAnchor.MiddleLeft, _cfg.ink)
                 .rectTransform.pivot = new Vector2(0, 1);
 
             // Vidas
             _livesRow = new GameObject("Lives", typeof(RectTransform)).GetComponent<RectTransform>();
             _livesRow.SetParent(_root, false);
-            Anchor(_livesRow, new Vector2(0, 1), new Vector2(60, -150), new Vector2(300, 40));
+            Anchor(_livesRow, new Vector2(0, 1), new Vector2(60, -178), new Vector2(300, 48));
 
             // Distancia y monedas
             _distance = Label("Distance", _root, new Vector2(0.5f, 1), new Vector2(0, -70), new Vector2(500, 90), "0 m", 40, 72, TextAnchor.MiddleCenter, _cfg.ink);
-            _coins = Label("Coins", _root, new Vector2(1, 1), new Vector2(-200, -70), new Vector2(320, 70), "0", 30, 52, TextAnchor.MiddleCenter, _cfg.ink);
+            _coins = Label("Coins", _root, new Vector2(1, 1), new Vector2(-170, -70), new Vector2(240, 70), "0", 30, 52, TextAnchor.MiddleCenter, _cfg.ink);
+            var coin = Box("CoinIcon", _root, new Vector2(1, 1), new Vector2(-410, -80), new Vector2(50, 50), _cfg.reward).GetComponent<Image>();
+            coin.sprite = InkArt.Blob;
 
             // Pausa
-            _pauseButton = MakeButton("Pause", _root, new Vector2(1, 1), new Vector2(-60, -60), new Vector2(84, 84), "II", () => _game.SetPaused(true)).gameObject;
+            _pauseButton = MakeButton("Pause", _root, new Vector2(1, 1), new Vector2(-50, -50), new Vector2(100, 100), "II", () => _game.SetPaused(true), round: true).gameObject;
 
             // Indicaciones y avisos
             _hint = Label("Hint", _root, new Vector2(0.5f, 0), new Vector2(0, 110), new Vector2(1200, 90), "", 32, 56, TextAnchor.MiddleCenter, _cfg.ink);
@@ -106,7 +111,7 @@ namespace ArrowBlaster
         public void Tick(float force, float fullForce, float distance, int coins)
         {
             float t = Mathf.Clamp01(force / Mathf.Max(1f, fullForce));
-            _forceFill.rectTransform.sizeDelta = new Vector2(508f * t, 32f);
+            _forceFill.fillAmount = t;
             _distance.text = $"{Mathf.Max(0f, distance):0} m";
             _coins.text = coins.ToString();
         }
@@ -116,11 +121,12 @@ namespace ArrowBlaster
             while (_lives.Count < _cfg.lives)
             {
                 int i = _lives.Count;
-                var img = Box("Life", _livesRow, new Vector2(0, 0.5f), new Vector2(20 + i * 52, 0), new Vector2(38, 38), _cfg.ink).GetComponent<Image>();
+                var img = Box("Life", _livesRow, new Vector2(0, 0.5f), new Vector2(10 + i * 56, 0), new Vector2(46, 46), _cfg.ink).GetComponent<Image>();
+                img.sprite = InkArt.Blob;
                 _lives.Add(img);
             }
             for (int i = 0; i < _lives.Count; i++)
-                _lives[i].color = i < lives ? _cfg.ink : _cfg.inkSoft;
+                _lives[i].color = i < lives ? _cfg.attack : new Color(_cfg.ink.r, _cfg.ink.g, _cfg.ink.b, 0.15f);
         }
 
         public void Toast(string text, Color color, bool small = false)
@@ -186,7 +192,11 @@ namespace ArrowBlaster
 
         private GameObject Panel(string name)
         {
-            var bg = Box(name, _root, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(_cfg.paper.r, _cfg.paper.g, _cfg.paper.b, 0.92f));
+            var bg = Box(name, _root, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(_cfg.paper.r, _cfg.paper.g, _cfg.paper.b, 0.94f));
+            var img = bg.GetComponent<Image>();
+            img.sprite = InkArt.Paper;
+            img.type = Image.Type.Tiled;
+            img.raycastTarget = true; // bloquea los toques al juego mientras el panel está abierto
             Stretch(bg);
             return bg.gameObject;
         }
@@ -230,7 +240,7 @@ namespace ArrowBlaster
             t.text = text;
             t.color = color;
             t.alignment = align;
-            t.fontStyle = FontStyle.Bold;
+            t.fontStyle = FontStyle.Normal;
             t.resizeTextForBestFit = true;
             t.resizeTextMinSize = minSize;
             t.resizeTextMaxSize = maxSize;
@@ -241,21 +251,22 @@ namespace ArrowBlaster
             return t;
         }
 
-        private Button MakeButton(string name, Transform parent, Vector2 anchor, Vector2 pos, Vector2 size, string text, UnityEngine.Events.UnityAction onClick)
+        // Botón de tinta: trazo de pincel negro con el texto en color papel; los redondos son un ensō
+        private Button MakeButton(string name, Transform parent, Vector2 anchor, Vector2 pos, Vector2 size, string text, UnityEngine.Events.UnityAction onClick, bool round = false)
         {
             var rt = Box(name, parent, anchor, pos, size, _cfg.ink);
             var img = rt.GetComponent<Image>();
+            img.sprite = round ? InkArt.Ring : InkArt.Stroke;
             img.raycastTarget = true;
             var b = rt.gameObject.AddComponent<Button>();
             b.targetGraphic = img;
             var colors = b.colors;
-            colors.highlightedColor = new Color(0.85f, 0.85f, 0.85f);
-            colors.pressedColor = new Color(0.7f, 0.7f, 0.7f);
+            colors.highlightedColor = new Color(0.8f, 0.8f, 0.8f);
+            colors.pressedColor = new Color(0.6f, 0.6f, 0.6f);
             b.colors = colors;
             b.onClick.AddListener(onClick);
-            var inner = Box("Inner", rt, new Vector2(0.5f, 0.5f), Vector2.zero, size - new Vector2(12, 12), _cfg.paper);
-            inner.GetComponent<Image>().raycastTarget = false;
-            Label("Text", rt, new Vector2(0.5f, 0.5f), Vector2.zero, size - new Vector2(30, 24), text, 20, 56, TextAnchor.MiddleCenter, _cfg.ink);
+            Label("Text", rt, new Vector2(0.5f, 0.5f), round ? Vector2.zero : new Vector2(-size.x * 0.04f, 0f), size * (round ? 0.5f : 0.72f), text, 20, 60,
+                TextAnchor.MiddleCenter, round ? _cfg.ink : _cfg.paper);
             return b;
         }
     }

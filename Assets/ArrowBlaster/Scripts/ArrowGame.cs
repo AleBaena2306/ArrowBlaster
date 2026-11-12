@@ -25,7 +25,10 @@ namespace ArrowBlaster
         private SpriteRenderer _arrowHead;
         private SpriteRenderer[] _arrowParts;
         private TrailRenderer _trail;
-        private Transform _aimLine;
+        private Bow _bow;
+        private Transform _launchTarget;
+        private readonly List<SpriteRenderer> _aimDots = new List<SpriteRenderer>();
+        private float _drawTime, _dropTimer, _targetPunch;
         private readonly List<Obstacle> _obstacles = new List<Obstacle>();
         private float _nextSpawnX;
 
@@ -50,6 +53,7 @@ namespace ArrowBlaster
             Application.targetFrameRate = 60;
             SetupCamera();
             EnsureEventSystem();
+            Scenery.Create(_cam, Config);
             _hud = new Hud(this, Config);
         }
 
@@ -72,6 +76,8 @@ namespace ArrowBlaster
             _lives = Config.lives;
             _runCoins = 0;
             _aimTime = 0f;
+            _drawTime = 0f;
+            _targetPunch = 0f;
             _invulnerable = 0f;
             _attacking = false;
             _launchMultiplier = 1f;
@@ -126,18 +132,44 @@ namespace ArrowBlaster
         }
 
         // Apuntar: la flecha sube y baja delante de la diana; un toque dispara.
+        // Apuntar: el arco se tensa y sube y baja delante de la diana; un toque suelta la flecha.
+        private const float DrawDuration = 0.45f;
+        private const float ArrowTail = 1.12f;   // distancia del centro de la flecha a su culatín
+
         private void UpdateAim(float dt)
         {
             _aimTime += dt;
-            _pos = new Vector2(0f, Mathf.Sin(_aimTime * Mathf.PI * 2f * Config.aimSpeed) * Config.aimRange);
+            _drawTime += dt;
+            float y = Mathf.Sin(_aimTime * Mathf.PI * 2f * Config.aimSpeed) * Config.aimRange;
+            float draw = Mathf.SmoothStep(0f, 1f, _drawTime / DrawDuration);
+            _bow.transform.position = new Vector3(0f, y, 0f);
+            _bow.SetDraw(draw);
+            _pos = new Vector2(_bow.transform.position.x + _bow.NockX + ArrowTail, y);
             _vel = Vector2.right;
-            if (_aimLine != null) _aimLine.position = new Vector3(Config.targetX * 0.5f, _pos.y, 0f);
-            if (!_pressedThisFrame) return;
-            _launchY = _pos.y;
+            UpdateAimDots(true);
+
+            if (!_pressedThisFrame || draw < 0.95f) return;
+            _launchY = y;
+            _bow.Release();
             _state = State.Launch;
-            _vel = new Vector2(28f, 0f);
-            if (_aimLine != null) _aimLine.gameObject.SetActive(false);
+            _vel = new Vector2(30f, 0f);
+            UpdateAimDots(false);
             _hud.SetHint("");
+            _shake = 0.08f;
+        }
+
+        private void UpdateAimDots(bool visible)
+        {
+            float from = _pos.x + 0.8f, to = Config.targetX - 0.3f;
+            for (int i = 0; i < _aimDots.Count; i++)
+            {
+                var d = _aimDots[i];
+                d.enabled = visible;
+                if (!visible) continue;
+                float t = (i + 0.5f) / _aimDots.Count;
+                d.transform.position = new Vector3(Mathf.Lerp(from, to, t), _pos.y, 0f);
+                d.color = new Color(Config.ink.r, Config.ink.g, Config.ink.b, 0.28f * (1f - t * 0.6f));
+            }
         }
 
         // La flecha vuela recta hasta la diana; al cruzarla se decide el multiplicador de fuerza.
@@ -155,7 +187,9 @@ namespace ArrowBlaster
 
             _force = Mathf.Min(Config.initialForce * _launchMultiplier, Config.maxForce);
             _hud.Toast($"{label}  ×{_launchMultiplier:0.0}", color);
-            if (_launchMultiplier > 1f) { Splash(_pos, Config.ink, 10, 1.3f); _shake = 0.25f; }
+            _targetPunch = 1f;
+            if (_launchMultiplier > 1f) { Splash(_pos, Config.ink, 12, 1.3f); Splash(_pos, Config.attack, 6, 1f); _shake = 0.25f; }
+            else Splash(_pos, Config.ink, 5, 0.8f);
             _vel = new Vector2(Speed(), 2f);
             _state = State.Flight;
             _hud.SetHint("Tap to fly · Hold to attack");
@@ -198,6 +232,13 @@ namespace ArrowBlaster
 
             if (_invulnerable > 0f) _invulnerable -= dt;
 
+            _dropTimer -= dt;
+            if (_dropTimer <= 0f)
+            {
+                _dropTimer = _attacking ? 0.035f : 0.1f;
+                Drop(_pos - _vel.normalized * ArrowTail, _attacking ? Config.attack : Config.ink);
+            }
+
             SpawnAhead();
             Vector2 tip = TipPosition();
             for (int i = _obstacles.Count - 1; i >= 0; i--)
@@ -229,7 +270,9 @@ namespace ArrowBlaster
             _vel.x = Mathf.MoveTowards(_vel.x, 0f, 6f * dt);
             _vel.y -= Config.gravity * dt;
             _pos += _vel * dt;
-            foreach (var o in _obstacles) if (o != null) o.Tick(dt);
+            // Bucle por índice: un enemigo puede disparar (y añadir un proyectil a la lista) mientras se recorre
+            for (int i = _obstacles.Count - 1; i >= 0; i--)
+                if (_obstacles[i] != null) _obstacles[i].Tick(dt);
             if (_pos.y > Config.groundY) return;
             _pos.y = Config.groundY;
             Splash(_pos, Config.ink, 8, 1f);
@@ -351,49 +394,60 @@ namespace ArrowBlaster
 
         private void BuildLaunchArea()
         {
-            // Suelo de tinta (se repite siguiendo a la cámara)
-            var ground = Gfx.Shape("Ground", Gfx.Square, _world, new Vector2(0f, Config.groundY - 1f), new Vector2(4000f, 2f), Config.ink, 1);
-            ground.transform.localPosition = new Vector2(1900f, Config.groundY - 1f);
+            _bow = Bow.Create(_world, Config);
 
-            // Arco
-            Gfx.Shape("Bow", Gfx.Square, _world, new Vector2(-0.9f, 0f), new Vector2(0.18f, Config.aimRange * 2f + 1f), Config.ink, 4);
+            // Diana (mato) de anillos de tinta sobre un poste, con el centro rojo
+            float r = Config.targetHalfHeight;
+            _launchTarget = new GameObject("LaunchTarget").transform;
+            _launchTarget.SetParent(_world, false);
+            _launchTarget.localPosition = new Vector2(Config.targetX, 0f);
+            float postH = -Config.groundY + 0.5f;
+            Gfx.Shape("Post", InkArt.Stroke, _world, new Vector2(Config.targetX + 0.1f, -postH * 0.5f), new Vector2(postH, 0.32f), Config.ink, 2)
+                .transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            float[] rings = { 1f, 0.9f, 0.74f, 0.62f, 0.46f, 0.36f };
+            for (int i = 0; i < rings.Length; i++)
+                Gfx.Shape("Ring" + i, Gfx.Circle, _launchTarget, Vector2.zero, Vector2.one * r * 2f * rings[i], i % 2 == 0 ? Config.ink : Config.paper, 3 + i);
+            Gfx.Shape("Center", Gfx.Circle, _launchTarget, Vector2.zero, Vector2.one * Config.targetCenterHalf * 2f, Config.attack, 10);
+            Gfx.Shape("Enso", InkArt.Ring, _launchTarget, Vector2.zero, Vector2.one * r * 2.35f, Config.ink, 11);
 
-            // Diana vertical: anillo exterior, centro de color
-            float h = Config.targetHalfHeight;
-            var target = new GameObject("LaunchTarget").transform;
-            target.SetParent(_world, false);
-            target.localPosition = new Vector2(Config.targetX, 0f);
-            Gfx.Shape("Outer", Gfx.Square, target, Vector2.zero, new Vector2(0.5f, h * 2f), Config.ink, 3);
-            Gfx.Shape("Ring", Gfx.Square, target, Vector2.zero, new Vector2(0.36f, h * 1.4f), Config.paper, 4);
-            Gfx.Shape("Center", Gfx.Square, target, Vector2.zero, new Vector2(0.5f, Config.targetCenterHalf * 2f), Config.attack, 5);
-
-            // Guía de puntería
-            _aimLine = Gfx.Shape("AimLine", Gfx.Square, _world, Vector2.zero, new Vector2(Config.targetX, 0.04f), Config.inkSoft, 2).transform;
+            // Guía de puntería: puntos de tinta hasta la diana
+            _aimDots.Clear();
+            for (int i = 0; i < 9; i++)
+                _aimDots.Add(Gfx.Shape("AimDot", InkArt.Blob, _world, Vector2.zero, Vector2.one * 0.16f, Config.inkSoft, 2));
         }
 
         private void BuildArrow()
         {
             _arrow = new GameObject("Arrow").transform;
             _arrow.SetParent(_world, false);
-            var shaft = Gfx.Shape("Shaft", Gfx.Square, _arrow, new Vector2(-0.45f, 0f), new Vector2(1.1f, 0.09f), Config.ink, 10);
-            _arrowHead = Gfx.Shape("Head", Gfx.Triangle, _arrow, new Vector2(0.22f, 0f), new Vector2(0.34f, 0.3f), Config.ink, 11);
-            Gfx.Shape("Fletch", Gfx.Square, _arrow, new Vector2(-0.95f, 0f), new Vector2(0.22f, 0.24f), Config.ink, 10);
+            Color shaft = new Color32(0x2B, 0x24, 0x1F, 0xFF);
+            Color steel = new Color32(0x30, 0x34, 0x3A, 0xFF);
+
+            // Plumas rojas y blancas (yabane), astil de bambú oscuro, punta de acero y culatín
+            var featherTop = Gfx.Shape("FeatherTop", Gfx.Square, _arrow, new Vector2(-0.88f, 0.075f), new Vector2(0.44f, 0.1f), Config.attack, 9);
+            featherTop.transform.localRotation = Quaternion.Euler(0f, 0f, -9f);
+            var featherBottom = Gfx.Shape("FeatherBottom", Gfx.Square, _arrow, new Vector2(-0.88f, -0.075f), new Vector2(0.44f, 0.1f), Config.attack, 9);
+            featherBottom.transform.localRotation = Quaternion.Euler(0f, 0f, 9f);
+            Gfx.Shape("FeatherBand", Gfx.Square, _arrow, new Vector2(-0.86f, 0f), new Vector2(0.09f, 0.28f), Config.paper, 10);
+            Gfx.Shape("Shaft", Gfx.Square, _arrow, new Vector2(-0.36f, 0f), new Vector2(1.48f, 0.075f), shaft, 11);
+            Gfx.Shape("Nock", Gfx.Square, _arrow, new Vector2(-1.1f, 0f), new Vector2(0.07f, 0.11f), Config.ink, 12);
+            _arrowHead = Gfx.Shape("Head", Gfx.Triangle, _arrow, new Vector2(0.49f, 0f), new Vector2(0.26f, 0.2f), steel, 12);
 
             _arrowParts = _arrow.GetComponentsInChildren<SpriteRenderer>();
             _trail = _arrow.gameObject.AddComponent<TrailRenderer>();
-            _trail.sharedMaterial = shaft.sharedMaterial;
-            _trail.time = 0.35f;
+            _trail.sharedMaterial = InkArt.SpriteMaterial;
+            _trail.time = 0.4f;
             _trail.minVertexDistance = 0.05f;
-            _trail.widthCurve = new AnimationCurve(new Keyframe(0f, 0.16f), new Keyframe(1f, 0f));
-            _trail.startColor = Config.ink;
-            _trail.endColor = new Color(Config.ink.r, Config.ink.g, Config.ink.b, 0f);
-            _trail.sortingOrder = 9;
+            _trail.numCapVertices = 3;
+            _trail.widthCurve = new AnimationCurve(new Keyframe(0f, 0.13f), new Keyframe(0.3f, 0.09f), new Keyframe(1f, 0f));
+            _trail.sortingOrder = 8;
+            _trail.emitting = false;
         }
 
         private Vector2 TipPosition()
         {
             float a = Mathf.Atan2(_vel.y, Mathf.Max(0.01f, _vel.x));
-            return _pos + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * 0.35f;
+            return _pos + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * 0.55f;
         }
 
         private void UpdateArrowVisual()
@@ -404,11 +458,21 @@ namespace ArrowBlaster
             _arrow.rotation = Quaternion.Euler(0f, 0f, angle);
 
             bool blink = _invulnerable > 0f && Mathf.Repeat(Time.time * 12f, 1f) < 0.5f;
-            _arrowHead.color = _attacking ? Config.attack : Config.ink;
-            _arrowHead.transform.localScale = _attacking ? new Vector3(0.5f, 0.44f, 1f) : new Vector3(0.34f, 0.3f, 1f);
+            _arrowHead.color = _attacking ? Config.attack : new Color32(0x30, 0x34, 0x3A, 0xFF);
+            _arrowHead.transform.localScale = _attacking ? new Vector3(0.42f, 0.32f, 1f) : new Vector3(0.26f, 0.2f, 1f);
             foreach (var part in _arrowParts) part.enabled = !blink;
-            _trail.widthMultiplier = _attacking ? 2.2f : 1f;
-            _trail.startColor = _attacking ? Config.attack : Config.ink;
+            _trail.emitting = _state == State.Launch || _state == State.Flight || _state == State.Falling;
+            _trail.widthMultiplier = _attacking ? 2.4f : 1f;
+            Color tc = _attacking ? Config.attack : Config.ink;
+            _trail.startColor = new Color(tc.r, tc.g, tc.b, 0.9f);
+            _trail.endColor = new Color(tc.r, tc.g, tc.b, 0f);
+
+            if (_launchTarget != null)
+            {
+                _targetPunch = Mathf.MoveTowards(_targetPunch, 0f, Time.deltaTime * 3f);
+                float k = Mathf.Sin(_targetPunch * Mathf.PI * 3f) * _targetPunch * 0.12f;
+                _launchTarget.localScale = new Vector3(1f - k, 1f + k, 1f);
+            }
         }
 
         private void UpdateCamera(float dt)
@@ -428,27 +492,42 @@ namespace ArrowBlaster
             _cam.transform.position = p;
         }
 
-        // Salpicadura de tinta de prueba: círculos que salen despedidos y se desvanecen
+        // Salpicadura de tinta: manchas que salen despedidas y se desvanecen, y una mancha que queda un momento
         private void Splash(Vector2 at, Color color, int count, float power)
         {
             for (int i = 0; i < count; i++)
             {
-                float size = Random.Range(0.12f, 0.38f) * power;
-                var sr = Gfx.Shape("Ink", Gfx.Circle, _world, at, Vector2.one * size, color, 20);
-                StartCoroutine(SplashDrop(sr, Random.insideUnitCircle.normalized * Random.Range(2f, 6f) * power));
+                float size = Random.Range(0.12f, 0.42f) * power;
+                var sr = Gfx.Shape("Ink", InkArt.Blob, _world, at, Vector2.one * size, color, 20);
+                sr.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
+                StartCoroutine(Fade(sr, Random.insideUnitCircle.normalized * Random.Range(2f, 7f) * power, Random.Range(0.35f, 0.65f)));
             }
+            var stain = Gfx.Shape("Stain", InkArt.Blob, _world, at, Vector2.one * 0.9f * power, new Color(color.r, color.g, color.b, 0.55f), 3);
+            stain.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
+            StartCoroutine(Fade(stain, Vector2.zero, 1.4f));
         }
 
-        private IEnumerator SplashDrop(SpriteRenderer sr, Vector2 v)
+        // Gota de tinta que deja la flecha al volar
+        private void Drop(Vector2 at, Color color)
         {
-            float t = 0f, life = Random.Range(0.35f, 0.6f);
+            var sr = Gfx.Shape("Drop", InkArt.Blob, _world, at + Random.insideUnitCircle * 0.06f, Vector2.one * Random.Range(0.07f, 0.16f),
+                new Color(color.r, color.g, color.b, 0.7f), 7);
+            StartCoroutine(Fade(sr, Vector2.down * Random.Range(0.1f, 0.5f), Random.Range(0.5f, 0.9f)));
+        }
+
+        private IEnumerator Fade(SpriteRenderer sr, Vector2 v, float life)
+        {
+            float t = 0f;
             Color c = sr.color;
+            Vector3 scale = sr.transform.localScale;
             while (t < life && sr != null)
             {
                 t += Time.deltaTime;
                 v *= 1f - 4f * Time.deltaTime;
                 sr.transform.position += (Vector3)(v * Time.deltaTime);
-                sr.color = new Color(c.r, c.g, c.b, c.a * (1f - t / life));
+                float k = t / life;
+                sr.color = new Color(c.r, c.g, c.b, c.a * (1f - k * k));
+                sr.transform.localScale = scale * (1f + k * 0.25f);
                 yield return null;
             }
             if (sr != null) Destroy(sr.gameObject);
