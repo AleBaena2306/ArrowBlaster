@@ -21,7 +21,7 @@ namespace ArrowBlaster
         private RectTransform _livesRow;
         private Image _flash;
         private GameObject _overPanel, _pausePanel, _pauseButton;
-        private Text _overTitle, _overBody, _overButtonText;
+        private Text _overTitle, _overBody, _overButtonText, _shopCoins;
         private GameObject _shopButton;
         private RectTransform _forceBar;
         private float _drainFx;
@@ -102,6 +102,10 @@ namespace ArrowBlaster
             _overTitle = Label("Title", _overPanel.transform, new Vector2(0.5f, 0.5f), new Vector2(0, 410), new Vector2(1000, 110), "", 40, 90, TextAnchor.MiddleCenter, _cfg.ink);
             _overBody = Label("Body", _overPanel.transform, new Vector2(0.5f, 0.5f), new Vector2(0, 320), new Vector2(1200, 60), "", 24, 40, TextAnchor.MiddleCenter, _cfg.ink);
             BuildShop(_overPanel.transform);
+            // Monedas disponibles, arriba a la derecha del panel (mismo sitio que en el HUD)
+            var coinIcon = Box("CoinIcon", _overPanel.transform, new Vector2(1, 1), new Vector2(-410, -80), new Vector2(50, 50), _cfg.reward).GetComponent<Image>();
+            coinIcon.sprite = InkArt.Blob;
+            _shopCoins = Label("Coins", _overPanel.transform, new Vector2(1, 1), new Vector2(-170, -70), new Vector2(240, 70), "0", 30, 52, TextAnchor.MiddleCenter, _cfg.ink);
             var again = MakeButton("Again", _overPanel.transform, new Vector2(0.5f, 0.5f), new Vector2(0, -400), new Vector2(420, 110), "AGAIN", OnOverButton);
             _overButtonText = again.GetComponentInChildren<Text>();
             _overPanel.SetActive(false);
@@ -231,6 +235,7 @@ namespace ArrowBlaster
         private void RefreshShop()
         {
             int coins = Save.Coins;
+            _shopCoins.text = coins.ToString();
             foreach (var row in _shopRows)
             {
                 var def = Upgrades.Get(row.Stat);
