@@ -86,6 +86,7 @@ namespace ArrowBlaster.Editor
             PlayerPrefs.DeleteKey("ab_coins");
             PlayerPrefs.DeleteKey("ab_best");
             Upgrades.ResetAll();
+            Save.ResetProgress();
             PlayerPrefs.Save();
         }
     }

@@ -75,7 +75,7 @@ namespace ArrowBlaster
         [Tooltip("Velocidad vertical que da cada toque.")]
         public float flapVelocity = 8.5f;
         [Tooltip("Segundos pulsando para entrar en modo ataque.")]
-        public float holdThreshold = 0.18f;
+        public float holdThreshold = 0.15f;
         [Tooltip("Gravedad mientras se ataca (planeo).")]
         public float attackGravityScale = 0.15f;
         [Tooltip("Radio de choque de la punta de la flecha.")]
@@ -94,7 +94,7 @@ namespace ArrowBlaster
         [Tooltip("Alto del hueco de las paredes.")]
         public float gapHeight = 3.4f;
         public float wallWidth = 0.9f;
-        [Tooltip("Probabilidades relativas: pared, enemigo, dianas.")]
+        [Tooltip("Probabilidades relativas: pared, enemigo, monedas (las partículas tienen su propio peso).")]
         public float wallWeight = 4f;
         public float enemyWeight = 2f;
         public float targetsWeight = 2f;
@@ -102,6 +102,31 @@ namespace ArrowBlaster
         public float enemyFireInterval = 1.6f;
         [Tooltip("Distancia a la que el enemigo empieza a disparar.")]
         public float enemyRange = 18f;
+
+        [Header("Partículas de impulso (como en Burrito Bison)")]
+        [Tooltip("Probabilidad relativa de un grupo de partículas frente a pared, enemigo y monedas.")]
+        public float pickupsWeight = 3f;
+        [Tooltip("Proporción de partículas malas (frenan).")]
+        [Range(0f, 1f)] public float badPickupChance = 0.3f;
+        [Tooltip("Fuerza que da una partícula buena y quita una mala.")]
+        public float pickupForce = 9f;
+        [Tooltip("Segundos de acelerón tras una partícula buena.")]
+        public float pickupBoostTime = 0.6f;
+        public float pickupBoostMultiplier = 1.3f;
+
+        [Header("Zonas y jefes")]
+        [Tooltip("Distancia hasta el jefe de cada zona (metros).")]
+        public float[] zoneLengths = { 300f, 450f, 600f, 800f };
+        [Tooltip("Vida de cada jefe (se conserva entre runs).")]
+        public float[] bossHp = { 400f, 900f, 1600f, 2500f };
+        [Tooltip("Monedas por derrotar a cada jefe.")]
+        public int[] bossReward = { 100, 200, 350, 600 };
+        [Tooltip("Daño por golpe atacando (lo aumenta la mejora Destrucción).")]
+        public float bossDamage = 30f;
+        public float bossRadius = 1.5f;
+        public float bossFireInterval = 1.3f;
+        [Tooltip("Distancia a la que el jefe espera por delante de la flecha.")]
+        public float bossDistance = 8f;
 
         [Header("Monedas")]
         public float coinsPerMeter = 0.1f;

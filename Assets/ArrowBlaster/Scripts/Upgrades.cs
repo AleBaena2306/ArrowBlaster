@@ -4,7 +4,7 @@ namespace ArrowBlaster
 {
     // Tienda de mejoras (GDD): Fuerza inicial y Puntería (arco); Vida, Velocidad y Destrucción (flecha).
     // Cada mejora tiene su color de barra. Niveles y coste en PlayerPrefs (pasará a StorePlatform).
-    public enum Stat { Power, Aim, Life, Speed, Destruction }
+    public enum Stat { Power, Aim, Life, Speed, Destruction, Target }
 
     public static class Upgrades
     {
@@ -19,7 +19,8 @@ namespace ArrowBlaster
             new Def { Stat = Stat.Aim, Name = "AIM", Detail = "Slower target", Color = new Color32(0x2A, 0x7F, 0xD4, 0xFF), MaxLevel = 10, BaseCost = 30, Growth = 1.4f },
             new Def { Stat = Stat.Life, Name = "LIFE", Detail = "Extra hits", Color = new Color32(0x3B, 0xA5, 0x5C, 0xFF), MaxLevel = 6, BaseCost = 60, Growth = 1.8f },
             new Def { Stat = Stat.Speed, Name = "SPEED", Detail = "Faster, lasts longer", Color = new Color32(0xE8, 0xA3, 0x17, 0xFF), MaxLevel = 15, BaseCost = 30, Growth = 1.35f },
-            new Def { Stat = Stat.Destruction, Name = "DESTRUCTION", Detail = "Cheaper attacks", Color = new Color32(0x8E, 0x44, 0xAD, 0xFF), MaxLevel = 15, BaseCost = 35, Growth = 1.38f },
+            new Def { Stat = Stat.Destruction, Name = "DESTRUCTION", Detail = "Cheaper attacks, more boss damage", Color = new Color32(0x8E, 0x44, 0xAD, 0xFF), MaxLevel = 15, BaseCost = 35, Growth = 1.38f },
+            new Def { Stat = Stat.Target, Name = "TARGET", Detail = "Bigger boost from the target", Color = new Color32(0x17, 0xA2, 0xB8, 0xFF), MaxLevel = 10, BaseCost = 40, Growth = 1.42f },
         };
 
         private static string Key(Stat s) => "ab_up_" + s;
@@ -44,6 +45,9 @@ namespace ArrowBlaster
         public static int ExtraLives => Level(Stat.Life);
         public static float SpeedMultiplier => 1f + 0.04f * Level(Stat.Speed);
         public static float DecayMultiplier => Mathf.Max(0.35f, 1f - 0.045f * Level(Stat.Speed));
+        public static float BossDamageMultiplier => 1f + 0.12f * Level(Stat.Destruction);
+        public static float TargetCenterBonus => 0.1f * Level(Stat.Target);
+        public static float TargetRingBonus => 0.06f * Level(Stat.Target);
         public static float AttackCostMultiplier => Mathf.Max(0.3f, 1f - 0.045f * Level(Stat.Destruction));
     }
 }

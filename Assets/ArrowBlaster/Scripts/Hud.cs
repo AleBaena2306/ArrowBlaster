@@ -24,6 +24,8 @@ namespace ArrowBlaster
         private Text _overTitle, _overBody, _overButtonText, _shopCoins;
         private GameObject _shopButton;
         private RectTransform _forceBar;
+        private Image _progressFill, _bossMark;
+        private Text _progressLabel;
         private float _drainFx;
         private readonly List<ShopRow> _shopRows = new List<ShopRow>();
         private bool _shopFromAim;
@@ -79,6 +81,17 @@ namespace ArrowBlaster
 
             // Distancia y monedas
             _distance = Label("Distance", _root, new Vector2(0.5f, 1), new Vector2(0, -70), new Vector2(500, 90), "0 m", 40, 72, TextAnchor.MiddleCenter, _cfg.ink);
+            // Barra de progreso hasta el jefe (o vida del jefe), justo debajo de la distancia
+            var prog = Box("Progress", _root, new Vector2(0.5f, 1), new Vector2(0, -132), new Vector2(620, 26), new Color(_cfg.ink.r, _cfg.ink.g, _cfg.ink.b, 0.15f));
+            prog.GetComponent<Image>().sprite = InkArt.Stroke;
+            _progressFill = Box("Fill", prog, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620, 26), _cfg.ink).GetComponent<Image>();
+            _progressFill.sprite = InkArt.Stroke;
+            _progressFill.type = Image.Type.Filled;
+            _progressFill.fillMethod = Image.FillMethod.Horizontal;
+            _progressFill.fillOrigin = (int)Image.OriginHorizontal.Left;
+            _bossMark = Box("BossMark", prog, new Vector2(1, 0.5f), new Vector2(26, 0), new Vector2(46, 46), _cfg.attack).GetComponent<Image>();
+            _bossMark.sprite = InkArt.Blob;
+            _progressLabel = Label("ProgressLabel", _root, new Vector2(0.5f, 1), new Vector2(0, -158), new Vector2(500, 36), "", 16, 26, TextAnchor.MiddleCenter, _cfg.ink);
             _coins = Label("Coins", _root, new Vector2(1, 1), new Vector2(-170, -70), new Vector2(240, 70), "0", 30, 52, TextAnchor.MiddleCenter, _cfg.ink);
             var coin = Box("CoinIcon", _root, new Vector2(1, 1), new Vector2(-410, -80), new Vector2(50, 50), _cfg.reward).GetComponent<Image>();
             coin.sprite = InkArt.Blob;
@@ -129,6 +142,15 @@ namespace ArrowBlaster
         }
 
         public void SetHint(string text) => _hint.text = text;
+
+        // t = avance hacia el jefe (0-1) o, en combate, vida que le queda
+        public void SetProgress(float t, bool bossFight, string label)
+        {
+            _progressFill.fillAmount = Mathf.Clamp01(t);
+            _progressFill.color = bossFight ? _cfg.attack : _cfg.ink;
+            _bossMark.enabled = !bossFight;
+            _progressLabel.text = label;
+        }
 
         public void Tick(float force, float fullForce, float distance, int coins, bool draining = false, bool aiming = false)
         {
@@ -207,7 +229,7 @@ namespace ArrowBlaster
             for (int i = 0; i < Upgrades.All.Length; i++)
             {
                 var def = Upgrades.All[i];
-                float y = 200 - i * 112;
+                float y = 225 - i * 96;
                 var row = new ShopRow { Stat = def.Stat };
                 Label("Name", parent, new Vector2(0.5f, 0.5f), new Vector2(-560, y + 14), new Vector2(380, 56), def.Name, 24, 44, TextAnchor.MiddleLeft, _cfg.ink);
                 Label("Detail", parent, new Vector2(0.5f, 0.5f), new Vector2(-560, y - 30), new Vector2(380, 34), def.Detail, 16, 26, TextAnchor.MiddleLeft, new Color(_cfg.ink.r, _cfg.ink.g, _cfg.ink.b, 0.6f));

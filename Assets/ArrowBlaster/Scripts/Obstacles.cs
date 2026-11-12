@@ -205,3 +205,58 @@ namespace ArrowBlaster
         }
     }
 }
+
+namespace ArrowBlaster
+{
+    // Partículas de impulso: las buenas (estrellas doradas) dan fuerza y un acelerón; las malas (humo de tinta) frenan.
+    // Se recogen al tocarlas, ataques aparte. Van en grupos en línea o en arco para que merezca la pena ir a por ellas.
+    public sealed class PickupCluster : Obstacle
+    {
+        private const float Radius = 0.42f;
+        private readonly System.Collections.Generic.List<(Transform t, bool good)> _items = new System.Collections.Generic.List<(Transform, bool)>();
+        private float _phase;
+
+        public override float RightEdge => transform.position.x + 7f;
+
+        protected override void Build()
+        {
+            int count = Random.Range(4, 8);
+            bool arc = Random.value < 0.5f;
+            for (int i = 0; i < count; i++)
+            {
+                float k = i / (float)(count - 1);
+                float dy = arc ? Mathf.Sin(k * Mathf.PI) * 1.6f - 0.6f : (k - 0.5f) * Random.Range(-2f, 2f);
+                bool good = Random.value >= Cfg.badPickupChance;
+                var t = new GameObject(good ? "Good" : "Bad").transform;
+                t.SetParent(transform, false);
+                t.localPosition = new Vector2(i * 1.05f, dy);
+                if (good) KenneyArt.Shape("star", t, Vector2.zero, Radius * 2.6f, Cfg.ink, 6, keepColor: true);
+                else KenneyArt.Shape("smoke", t, Vector2.zero, Radius * 2.6f, Cfg.ink, 6);
+                _items.Add((t, good));
+            }
+        }
+
+        public override void Tick(float dt)
+        {
+            _phase += dt;
+            for (int i = 0; i < _items.Count; i++)
+            {
+                var t = _items[i].t;
+                t.localScale = Vector3.one * (1f + Mathf.Sin(_phase * 6f + i) * 0.08f);
+                t.localRotation = Quaternion.Euler(0f, 0f, (_items[i].good ? 40f : -25f) * _phase);
+            }
+        }
+
+        public override bool CheckHit(Vector2 tip, float radius, bool attacking)
+        {
+            for (int i = _items.Count - 1; i >= 0; i--)
+            {
+                if (!CircleCircle(tip, radius, _items[i].t.position, Radius)) continue;
+                Game.Pickup(_items[i].t.position, _items[i].good);
+                Destroy(_items[i].t.gameObject);
+                _items.RemoveAt(i);
+            }
+            return _items.Count == 0;
+        }
+    }
+}

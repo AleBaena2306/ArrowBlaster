@@ -29,6 +29,13 @@ namespace ArrowBlaster
         private Lantern _lantern;
         private readonly List<SpriteRenderer> _aimDots = new List<SpriteRenderer>();
         private float _dropTimer;
+
+        // Zonas y jefes
+        private int _zone;
+        private Boss _boss;
+        private bool _bossDone;
+        private float _boostTime;
+        private float ZoneLength => Config.zoneLengths[Mathf.Clamp(_zone, 0, Config.zoneLengths.Length - 1)];
         private readonly List<Obstacle> _obstacles = new List<Obstacle>();
         private float _nextSpawnX;
 
@@ -87,6 +94,10 @@ namespace ArrowBlaster
             _attacking = false;
             _launchMultiplier = 1f;
             _nextSpawnX = Config.firstObstacleX;
+            _zone = Mathf.Clamp(Save.Zone, 0, Config.zoneLengths.Length - 1);
+            _boss = null;
+            _bossDone = false;
+            _boostTime = 0f;
             _state = State.Aim;
             _hud.ShowRun(_lives);
             _hud.SetHint("Drag back to aim · Release to shoot");
@@ -112,6 +123,9 @@ namespace ArrowBlaster
 
             UpdateArrowVisual();
             UpdateCamera(dt);
+            if (_boss != null) _hud.SetProgress(_boss.Hp / _boss.MaxHp, true, "BOSS");
+            else if (_bossDone) _hud.SetProgress(1f, false, "ZONE CLEARED");
+            else _hud.SetProgress(Mathf.Clamp01(_pos.x / ZoneLength), false, Save.Loop > 0 ? $"ZONE {_zone + 1} · NG+{Save.Loop}" : $"ZONE {_zone + 1}");
             _hud.Tick(_force, _state == State.Aim ? 1f : _startForce, _pos.x, Save.Coins + _runCoins,
                 draining: _attacking && _state == State.Flight, aiming: _state == State.Aim);
         }
@@ -242,8 +256,8 @@ namespace ArrowBlaster
                 float t = (lx - prevX) / Mathf.Max(0.0001f, _pos.x - prevX);
                 float yAtLantern = Mathf.Lerp(prevY, _pos.y, t);
                 float off = Mathf.Abs(yAtLantern - _lantern.Y);
-                if (off <= Config.lanternCenterRadius) BeginFlight(Config.centerMultiplier, "PERFECT", true);
-                else if (off <= Config.lanternRadius) BeginFlight(Config.ringMultiplier, "GOOD", true);
+                if (off <= Config.lanternCenterRadius) BeginFlight(Config.centerMultiplier + Upgrades.TargetCenterBonus, "PERFECT", true);
+                else if (off <= Config.lanternRadius) BeginFlight(Config.ringMultiplier + Upgrades.TargetRingBonus, "GOOD", true);
                 else BeginFlight(Config.missMultiplier, "MISS", false);
                 return;
             }
@@ -260,7 +274,7 @@ namespace ArrowBlaster
             _launchMultiplier = multiplier;
             _force = Mathf.Min(Config.initialForce * Upgrades.PowerMultiplier * multiplier * Mathf.Lerp(0.7f, 1f, _launchDraw), Config.maxForce);
             _startForce = Mathf.Max(1f, _force);
-            bool perfect = multiplier >= Config.centerMultiplier;
+            bool perfect = label == "PERFECT";
             _hud.Toast($"{label}  ×{multiplier:0.0}", perfect ? Config.attack : Config.ink);
             if (hitLantern)
             {
@@ -287,12 +301,15 @@ namespace ArrowBlaster
 
         // Atacar: la flecha va en línea recta y más rápida, pero gasta fuerza a cada segundo
         private float Speed() => (Config.minSpeed + _force * Config.speedPerForce) * Upgrades.SpeedMultiplier
-                                 * (_attacking ? Config.attackSpeedMultiplier : 1f);
+                                 * (_attacking ? Config.attackSpeedMultiplier : 1f)
+                                 * (_boostTime > 0f ? Config.pickupBoostMultiplier : 1f);
 
         private void UpdateFlight(float dt)
         {
             // Entrada: tocar = impulso; mantener = atacar (planeo)
-            if (_pressedThisFrame) { _vel.y = Config.flapVelocity; _holdTime = 0f; }
+            // Tocar (soltar antes del umbral) = impulso; mantener = atacar sin subir antes
+            if (_releasedThisFrame && _holdTime < Config.holdThreshold) _vel.y = Config.flapVelocity;
+            if (_pressedThisFrame) _holdTime = 0f;
             if (_pressed) _holdTime += dt; else _holdTime = 0f;
             _attacking = _pressed && _holdTime >= Config.holdThreshold;
 
@@ -314,6 +331,7 @@ namespace ArrowBlaster
             }
 
             if (_invulnerable > 0f) _invulnerable -= dt;
+            if (_boostTime > 0f) _boostTime -= dt;
 
             _dropTimer -= dt;
             if (_dropTimer <= 0f)
@@ -398,6 +416,70 @@ namespace ArrowBlaster
             StartCoroutine(HitStop(0.035f));
         }
 
+        // ───────────────────────── Jefes y partículas ─────────────────────────
+
+        private void SpawnBoss()
+        {
+            var go = new GameObject("Boss");
+            go.transform.SetParent(_world, false);
+            go.transform.position = new Vector2(_pos.x + 20f, 0f);
+            var b = go.AddComponent<Boss>();
+            b.Zone = _zone;
+            b.MaxHp = Config.bossHp[Mathf.Clamp(_zone, 0, Config.bossHp.Length - 1)] * (1 + Save.Loop);
+            float saved = Save.BossHp(_zone);
+            b.Hp = saved > 0f ? Mathf.Min(saved, b.MaxHp) : b.MaxHp;
+            b.Init(this);
+            _obstacles.Add(b);
+            _boss = b;
+            _hud.Toast("BOSS!", Config.attack);
+        }
+
+        // Golpe atacando al jefe. Devuelve true si cae.
+        public bool HitBoss(Boss boss, Vector2 at)
+        {
+            if (_invulnerable > 0f) return false;
+            float dmg = Config.bossDamage * Upgrades.BossDamageMultiplier;
+            boss.Hp = Mathf.Max(0f, boss.Hp - dmg);
+            boss.Knockback(3f);
+            Break(at, Config.breakForceCost, 0, Config.attack);
+            _invulnerable = 0.15f;
+            if (boss.Hp > 0f) { Save.SetBossHp(_zone, boss.Hp); return false; }
+
+            // Jefe derrotado: recompensa, siguiente zona (o vuelta de New Game+ con jefes más duros)
+            int reward = Config.bossReward[Mathf.Clamp(_zone, 0, Config.bossReward.Length - 1)] * (1 + Save.Loop);
+            _runCoins += reward;
+            Save.SetBossHp(_zone, -1f);
+            int next = _zone + 1;
+            if (next >= Config.zoneLengths.Length) { next = 0; Save.Loop = Save.Loop + 1; }
+            Save.Zone = next;
+            _bossDone = true;
+            _boss = null;
+            _nextSpawnX = _pos.x + 25f;
+            Splash(boss.transform.position, Config.attack, 18, 2f);
+            Splash(boss.transform.position, Config.ink, 14, 1.6f);
+            _shake = 0.6f;
+            StartCoroutine(HitStop(0.15f));
+            _hud.Toast($"BOSS DEFEATED!  +{reward}", Config.attack);
+            return true;
+        }
+
+        public void Pickup(Vector2 at, bool good)
+        {
+            if (good)
+            {
+                _force = Mathf.Min(Config.maxForce, _force + Config.pickupForce);
+                _boostTime = Config.pickupBoostTime;
+                Splash(at, Config.reward, 4, 0.5f);
+            }
+            else
+            {
+                _force = Mathf.Max(0f, _force - Config.pickupForce);
+                _boostTime = 0f;
+                Splash(at, Config.ink, 5, 0.6f);
+                _shake = Mathf.Max(_shake, 0.12f);
+            }
+        }
+
         // Toque dorado recogido: monedas sin coste de fuerza ni parón
         public void Collect(Vector2 at, int coins)
         {
@@ -430,8 +512,11 @@ namespace ArrowBlaster
         private void SpawnAhead()
         {
             float viewRight = _cam.transform.position.x + _cam.orthographicSize * _cam.aspect;
+            // Jefe al final de la zona; antes de él no se ponen más obstáculos
+            if (!_bossDone && _boss == null && _pos.x >= ZoneLength - 14f) SpawnBoss();
             while (_nextSpawnX < viewRight + 15f)
             {
+                if (!_bossDone && _nextSpawnX > ZoneLength - 22f) break;
                 SpawnOne(_nextSpawnX);
                 _nextSpawnX += Random.Range(Config.minSpacing, Config.maxSpacing);
             }
@@ -439,7 +524,7 @@ namespace ArrowBlaster
 
         private void SpawnOne(float x)
         {
-            float total = Config.wallWeight + Config.enemyWeight + Config.targetsWeight;
+            float total = Config.wallWeight + Config.enemyWeight + Config.targetsWeight + Config.pickupsWeight;
             float r = Random.value * total;
             float margin = Config.gapHeight * 0.5f + 0.4f;
             if (r < Config.wallWeight)
@@ -454,8 +539,10 @@ namespace ArrowBlaster
             }
             else if (r < Config.wallWeight + Config.enemyWeight)
                 Spawn<Enemy>("Enemy", new Vector2(x, Random.Range(Config.groundY + 1.5f, Config.ceilingY - 1.5f)));
-            else
+            else if (r < Config.wallWeight + Config.enemyWeight + Config.targetsWeight)
                 Spawn<TargetCluster>("Targets", new Vector2(x, Random.Range(Config.groundY + 2f, Config.ceilingY - 2f)));
+            else
+                Spawn<PickupCluster>("Pickups", new Vector2(x, Random.Range(Config.groundY + 2.2f, Config.ceilingY - 2.2f)));
         }
 
         // ───────────────────────── Construcción ─────────────────────────
