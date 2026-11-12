@@ -14,7 +14,13 @@ namespace ArrowBlaster
         private const float RestNockX = -0.32f;
         private const float MaxPull = 1.05f;                // cuánto retrocede el culatín de la flecha tenso
 
-        private LineRenderer _limbs, _string;
+        private LineRenderer _string;
+        private Transform _limbs;
+        private SpriteRenderer _limbsSprite;
+
+        // Imagen del arco (Resources/BowLimbs.png, sin cuerda, vertical, abombado hacia delante).
+        // Coordenadas en píxeles de esa imagen: puntas y punto más adelantado (empuñadura).
+        private const float ImgTipX = 19.5f, ImgTopY = 4f, ImgBottomY = 505f, ImgGripX = 95f;
         private float _draw, _releaseTime = -1f, _releaseFrom, _wobble;
         // Ángulo de puntería en grados (el arco gira entero)
         public float Aim;
@@ -27,7 +33,6 @@ namespace ArrowBlaster
         {
             _scale = scale;
             transform.localScale = new Vector3(scale, scale, 1f);
-            _limbs.widthMultiplier = scale;
             _string.widthMultiplier = 0.012f * scale;
         }
         // Posición (local X) del culatín de la flecha en la cuerda
@@ -44,11 +49,22 @@ namespace ArrowBlaster
 
         private void Build(ArrowConfig cfg)
         {
-            // Una sola pincelada gruesa y seca, que se afila en las puntas curvadas
-            _limbs = MakeLine("Limbs", Segments, cfg.ink, 12, dry: 1f, wobble: 0.03f);
-            _limbs.widthCurve = new AnimationCurve(
-                new Keyframe(0f, 0f), new Keyframe(0.07f, 0.09f), new Keyframe(0.25f, 0.16f), new Keyframe(0.75f, 0.16f),
-                new Keyframe(0.93f, 0.08f), new Keyframe(1f, 0f));
+            // Arco: imagen de pincel; si falta, no se dibuja (la cuerda sigue funcionando)
+            var tex = Resources.Load<Texture2D>("BowLimbs");
+            _limbs = new GameObject("Limbs").transform;
+            _limbs.SetParent(transform, false);
+            if (tex != null)
+            {
+                float ppu = (ImgBottomY - ImgTopY) / (Top - Bottom);
+                var pivot = new Vector2(ImgGripX / tex.width, 1f - (ImgTopY + ImgBottomY) * 0.5f / tex.height);
+                var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), pivot, ppu, 0, SpriteMeshType.FullRect);
+                _limbsSprite = _limbs.gameObject.AddComponent<SpriteRenderer>();
+                _limbsSprite.sprite = sprite;
+                _limbsSprite.sharedMaterial = InkArt.SpriteMaterial;
+                _limbsSprite.color = cfg.ink;
+                _limbsSprite.sortingOrder = 12;
+            }
+            else Debug.LogWarning("[ArrowBlaster] Falta Resources/BowLimbs.png");
 
             // Cuerda: línea fina y limpia, gris oscuro
             _string = MakeLine("String", 3, new Color(0.25f, 0.25f, 0.25f, 1f), 11, dry: 0f, wobble: 0f);
@@ -113,22 +129,16 @@ namespace ArrowBlaster
             }
 
             transform.localRotation = Quaternion.Euler(0f, 0f, Aim + _wobble);
+            // Al tensar, las puntas retroceden: la imagen se estira en profundidad alrededor de la empuñadura
+            float gripX = RestTipX + (ImgGripX - ImgTipX) / ((ImgBottomY - ImgTopY) / (Top - Bottom));
             float tipX = Mathf.Lerp(RestTipX, DrawnTipX, draw);
-            float squeeze = Mathf.Lerp(1f, 0.93f, draw);
-            Vector2 topTip = Vector2.zero, bottomTip = Vector2.zero;
-            for (int i = 0; i < Segments; i++)
-            {
-                float t = i / (float)(Segments - 1);
-                float y = Mathf.Lerp(Top, Bottom, t) * squeeze;
-                // s: -1 en la punta superior, 0 en la empuñadura, 1 en la inferior (asimétrico)
-                float s = y >= 0f ? -y / (Top * squeeze) : y / (Bottom * squeeze);
-                float x = Mathf.Lerp(Bulge, tipX, s * s);
-                // Puntas que se curvan hacia delante (recurvado), como en la referencia
-                x += Mathf.SmoothStep(0.75f, 1f, Mathf.Abs(s)) * 0.16f;
-                _limbs.SetPosition(i, new Vector3(x, y, 0f));
-                if (i == 0) topTip = new Vector2(x, y);
-                if (i == Segments - 1) bottomTip = new Vector2(x, y);
-            }
+            float depthScale = (gripX - tipX) / (gripX - RestTipX);
+            float squeeze = Mathf.Lerp(1f, 0.95f, draw);
+            float midY = (Top + Bottom) * 0.5f;
+            _limbs.localPosition = new Vector3(gripX, midY, 0f);
+            _limbs.localScale = new Vector3(depthScale, squeeze, 1f);
+            Vector2 topTip = new Vector2(tipX, midY + (Top - midY) * squeeze);
+            Vector2 bottomTip = new Vector2(tipX, midY + (Bottom - midY) * squeeze);
 
             NockX = Mathf.Lerp(RestNockX, RestNockX - MaxPull, draw) + vibration;
             _string.SetPosition(0, topTip);

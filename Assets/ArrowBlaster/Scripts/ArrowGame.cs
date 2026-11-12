@@ -316,7 +316,7 @@ namespace ArrowBlaster
             if (_dropTimer <= 0f)
             {
                 _dropTimer = _attacking ? 0.035f : 0.1f;
-                Drop(_pos - _vel.normalized * ArrowTail, _attacking ? Config.attack : Config.ink);
+                Drop(_pos - _vel.normalized * ArrowTail * _arrowScale, Config.ink);
             }
 
             SpawnAhead();
@@ -526,11 +526,11 @@ namespace ArrowBlaster
             for (int i = 0; i < _arrowParts.Length; i++) _arrowBaseWidths[i] = _arrowParts[i].widthMultiplier;
             _lastArrowScale = -1f;
             _trail = _arrow.gameObject.AddComponent<TrailRenderer>();
-            InkArt.Apply(_trail, dry: 1f);
-            _trail.time = 0.4f;
+            InkArt.Apply(_trail, dry: 0.45f, wobble: 0.02f);
+            _trail.time = 0.6f;
             _trail.minVertexDistance = 0.05f;
             _trail.numCapVertices = 3;
-            _trail.widthCurve = new AnimationCurve(new Keyframe(0f, 0.13f), new Keyframe(0.3f, 0.09f), new Keyframe(1f, 0f));
+            _trail.widthCurve = new AnimationCurve(new Keyframe(0f, 0.16f), new Keyframe(0.25f, 0.13f), new Keyframe(1f, 0.02f));
             _trail.sortingOrder = 8;
             _trail.emitting = false;
         }
@@ -563,8 +563,8 @@ namespace ArrowBlaster
                 _lastArrowScale = _arrowScale;
             }
             _trail.emitting = _state == State.Launch || _state == State.Flight || _state == State.Falling;
-            _trail.widthMultiplier = (_attacking ? 2.4f : 1f) * _arrowScale;
-            Color tc = _attacking ? Config.attack : Config.ink;
+            _trail.widthMultiplier = (_attacking ? 1.6f : 1f) * _arrowScale;
+            Color tc = Config.ink; // la estela siempre es de tinta: solo la punta se pone roja al atacar
             _trail.startColor = new Color(tc.r, tc.g, tc.b, 0.9f);
             _trail.endColor = new Color(tc.r, tc.g, tc.b, 0f);
 
