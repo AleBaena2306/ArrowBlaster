@@ -97,18 +97,18 @@ Shader "ArrowBlaster/InkSprite"
                 float ink = 1.0 - lum;
 
                 // Líneas: tinta plena. Rellenos: aguada con vetas de pincel seco. Blancos: papel.
-                float line = smoothstep(0.62, 0.72, ink);
-                float fill = smoothstep(0.1, 0.2, ink) * (1.0 - line);
+                float lineInk = smoothstep(0.62, 0.72, ink);
+                float fill = smoothstep(0.1, 0.2, ink) * (1.0 - lineInk);
                 float streak = ValueNoise(float2(IN.uv.x * 3.0, IN.uv.y * 40.0) + seed);
                 float dry = lerp(1.0, smoothstep(0.25, 0.45, streak), _Dry);
                 float washAlpha = fill * _Wash * (0.75 + 0.25 * ValueNoise(IN.uv * 4.0 + seed)) * dry;
 
                 float3 inkColor = IN.color.rgb;
-                float alpha = saturate(line + washAlpha);
+                float alpha = saturate(lineInk + washAlpha);
                 float3 col = inkColor;
 
                 // Color conservado (enemigos, monedas, dianas): los rellenos saturados mantienen su color, algo más vivo
-                float keep = _KeepColor * smoothstep(0.25, 0.45, sat) * (1.0 - line);
+                float keep = _KeepColor * smoothstep(0.25, 0.45, sat) * (1.0 - lineInk);
                 float3 vivid = saturate((c.rgb - 0.5) * 1.25 + 0.5);
                 col = lerp(col, vivid, keep);
                 alpha = lerp(alpha, 1.0, keep);
