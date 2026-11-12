@@ -29,7 +29,10 @@ namespace ArrowBlaster
         public override void Tick(float dt)
         {
             _phase += dt;
-            _offset = Mathf.MoveTowards(_offset, Cfg.bossDistance, dt * 4f);
+            // El jefe va a la par de la flecha; al atacar, la flecha embiste y se le acerca.
+            // Sin atacar, el jefe recupera su distancia.
+            if (Game.IsAttacking) _offset = Mathf.Max(0f, _offset - Cfg.bossChargeSpeed * dt);
+            else _offset = Mathf.MoveTowards(_offset, Cfg.bossDistance, dt * 4f);
             var p = transform.position;
             p.x = Game.ArrowPosition.x + _offset;
             p.y = Mathf.Sin(_phase * 1.3f) * 2.2f + 0.3f;
@@ -40,7 +43,7 @@ namespace ArrowBlaster
             _sprite.color = Color.Lerp(Cfg.ink, Cfg.attack, _flash);
 
             _fireTimer -= dt;
-            if (_fireTimer > 0f || _offset > Cfg.bossDistance + 2f) return;
+            if (_fireTimer > 0f || _offset > Cfg.bossDistance + 2f || _offset < 3f) return;
             _fireTimer = Cfg.bossFireInterval * Random.Range(0.8f, 1.2f);
             Game.Spawn<Projectile>("BossShot", (Vector2)p + new Vector2(-Cfg.bossRadius, Random.Range(-0.6f, 0.6f)));
         }

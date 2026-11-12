@@ -129,6 +129,8 @@ namespace ArrowBlaster
         public float bossFireInterval = 1.3f;
         [Tooltip("Distancia a la que el jefe espera por delante de la flecha.")]
         public float bossDistance = 8f;
+        [Tooltip("Velocidad a la que la flecha se acerca al jefe mientras ataca.")]
+        public float bossChargeSpeed = 9f;
 
         [Header("Monedas")]
         public float coinsPerMeter = 0.1f;

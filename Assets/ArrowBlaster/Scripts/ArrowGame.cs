@@ -53,6 +53,7 @@ namespace ArrowBlaster
         private Hud _hud;
 
         public Vector2 ArrowPosition => _pos;
+        public bool IsAttacking => _attacking && _state == State.Flight;
 
         private void Awake()
         {
