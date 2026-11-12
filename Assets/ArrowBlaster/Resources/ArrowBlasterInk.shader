@@ -17,7 +17,7 @@ Shader "ArrowBlaster/Ink"
         _Dry ("Pincel seco", Range(0, 1)) = 0.7
         _Bristles ("Vetas por unidad", Float) = 18
         _Rim ("Borde oscuro", Range(0, 1)) = 0.35
-        _Density ("Variación de densidad", Range(0, 1)) = 0.3
+        _Density ("Variación de densidad", Range(0, 1)) = 0.12
     }
 
     SubShader

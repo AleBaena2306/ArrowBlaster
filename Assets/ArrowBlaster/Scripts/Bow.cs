@@ -15,7 +15,6 @@ namespace ArrowBlaster
         private const float MaxPull = 1.05f;                // cuánto retrocede el culatín de la flecha tenso
 
         private LineRenderer _limbs, _string;
-        private Transform _grip;
         private float _draw, _releaseTime = -1f, _releaseFrom, _wobble;
         // Ángulo de puntería en grados (el arco gira entero)
         public float Aim;
@@ -46,15 +45,13 @@ namespace ArrowBlaster
         private void Build(ArrowConfig cfg)
         {
             _limbs = MakeLine("Limbs", Segments, cfg.ink, 12);
+            // Una sola pincelada: entra fina, engorda en la empuñadura y sale seca
             _limbs.widthCurve = new AnimationCurve(
-                new Keyframe(0f, 0.045f), new Keyframe(0.62f, 0.13f), new Keyframe(0.7f, 0.13f), new Keyframe(1f, 0.045f));
+                new Keyframe(0f, 0.03f), new Keyframe(0.6f, 0.11f), new Keyframe(1f, 0.02f));
 
             _string = MakeLine("String", 3, new Color(cfg.ink.r, cfg.ink.g, cfg.ink.b, 0.75f), 11);
             _string.widthMultiplier = 0.028f;
 
-            // Empuñadura envuelta en rojo (como el ratán lacado de un yumi)
-            var grip = Gfx.Shape("Grip", Gfx.Square, transform, new Vector2(Bulge, 0f), new Vector2(0.17f, 0.42f), cfg.attack, 13);
-            _grip = grip.transform;
             Refresh();
         }
 
@@ -65,7 +62,7 @@ namespace ArrowBlaster
             var lr = go.AddComponent<LineRenderer>();
             lr.useWorldSpace = false;
             lr.positionCount = points;
-            InkArt.Apply(lr, dry: 0.5f);
+            InkArt.Apply(lr, dry: 0.8f);
             lr.startColor = lr.endColor = color;
             lr.numCapVertices = 4;
             lr.numCornerVertices = 2;
@@ -124,8 +121,6 @@ namespace ArrowBlaster
                 // s: -1 en la punta superior, 0 en la empuñadura, 1 en la inferior (asimétrico)
                 float s = y >= 0f ? -y / (Top * squeeze) : y / (Bottom * squeeze);
                 float x = Mathf.Lerp(Bulge, tipX, s * s);
-                // Recurvado leve en las puntas
-                x += Mathf.SmoothStep(0.85f, 1f, s * s) * 0.08f;
                 _limbs.SetPosition(i, new Vector3(x, y, 0f));
                 if (i == 0) topTip = new Vector2(x, y);
                 if (i == Segments - 1) bottomTip = new Vector2(x, y);

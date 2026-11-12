@@ -22,8 +22,10 @@ namespace ArrowBlaster
         private Camera _cam;
         private Transform _world;
         private Transform _arrow;
-        private SpriteRenderer _arrowHead;
-        private SpriteRenderer[] _arrowParts;
+        private LineRenderer _arrowHead;
+        private LineRenderer[] _arrowParts;
+        private float[] _arrowBaseWidths;
+        private float _lastArrowScale = -1f;
         private TrailRenderer _trail;
         private Bow _bow;
         private Lantern _lantern;
@@ -393,6 +395,14 @@ namespace ArrowBlaster
             StartCoroutine(HitStop(0.035f));
         }
 
+        // Toque dorado recogido: monedas sin coste de fuerza ni parón
+        public void Collect(Vector2 at, int coins)
+        {
+            _runCoins += coins;
+            Splash(at, Config.reward, 5, 0.6f);
+            _hud.Toast($"+{coins}", Config.reward, small: true);
+        }
+
         private IEnumerator HitStop(float seconds)
         {
             if (_paused) yield break;
@@ -492,20 +502,19 @@ namespace ArrowBlaster
         {
             _arrow = new GameObject("Arrow").transform;
             _arrow.SetParent(_world, false);
-            Color shaft = new Color32(0x2B, 0x24, 0x1F, 0xFF);
-            Color steel = new Color32(0x30, 0x34, 0x3A, 0xFF);
+            // Tres pinceladas: astil (fino detrás, grueso delante), punta y dos plumas rojas
+            var shaftCurve = new AnimationCurve(new Keyframe(0f, 0.35f), new Keyframe(0.85f, 1f), new Keyframe(1f, 0.6f));
+            Brush.Stroke("Shaft", _arrow, new Vector3[] { new Vector3(-1.12f, 0f), new Vector3(-0.4f, 0.01f), new Vector3(0.35f, 0f) },
+                0.09f, Config.ink, 11, 0.5f, shaftCurve);
+            var pointCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0.05f));
+            _arrowHead = Brush.Stroke("Head", _arrow, new Vector3[] { new Vector3(0.25f, 0f), new Vector3(0.62f, 0f) }, 0.2f, Config.ink, 12, 0.2f, pointCurve);
+            Brush.Line("FeatherTop", _arrow, new Vector2(-1.15f, 0.14f), new Vector2(-0.72f, 0.02f), 0.07f, Config.attack, 10, 0.1f);
+            Brush.Line("FeatherBottom", _arrow, new Vector2(-1.15f, -0.14f), new Vector2(-0.72f, -0.02f), 0.07f, Config.attack, 10, 0.1f);
 
-            // Plumas rojas y blancas (yabane), astil de bambú oscuro, punta de acero y culatín
-            var featherTop = Gfx.Shape("FeatherTop", Gfx.Square, _arrow, new Vector2(-0.88f, 0.075f), new Vector2(0.44f, 0.1f), Config.attack, 9);
-            featherTop.transform.localRotation = Quaternion.Euler(0f, 0f, -9f);
-            var featherBottom = Gfx.Shape("FeatherBottom", Gfx.Square, _arrow, new Vector2(-0.88f, -0.075f), new Vector2(0.44f, 0.1f), Config.attack, 9);
-            featherBottom.transform.localRotation = Quaternion.Euler(0f, 0f, 9f);
-            Gfx.Shape("FeatherBand", Gfx.Square, _arrow, new Vector2(-0.86f, 0f), new Vector2(0.09f, 0.28f), Config.paper, 10);
-            Gfx.Shape("Shaft", Gfx.Square, _arrow, new Vector2(-0.36f, 0f), new Vector2(1.48f, 0.075f), shaft, 11);
-            Gfx.Shape("Nock", Gfx.Square, _arrow, new Vector2(-1.1f, 0f), new Vector2(0.07f, 0.11f), Config.ink, 12);
-            _arrowHead = Gfx.Shape("Head", Gfx.Triangle, _arrow, new Vector2(0.49f, 0f), new Vector2(0.26f, 0.2f), steel, 12);
-
-            _arrowParts = _arrow.GetComponentsInChildren<SpriteRenderer>();
+            _arrowParts = _arrow.GetComponentsInChildren<LineRenderer>();
+            _arrowBaseWidths = new float[_arrowParts.Length];
+            for (int i = 0; i < _arrowParts.Length; i++) _arrowBaseWidths[i] = _arrowParts[i].widthMultiplier;
+            _lastArrowScale = -1f;
             _trail = _arrow.gameObject.AddComponent<TrailRenderer>();
             InkArt.Apply(_trail, dry: 1f);
             _trail.time = 0.4f;
@@ -533,9 +542,16 @@ namespace ArrowBlaster
             _arrow.rotation = Quaternion.Euler(0f, 0f, angle);
 
             bool blink = _invulnerable > 0f && Mathf.Repeat(Time.time * 12f, 1f) < 0.5f;
-            _arrowHead.color = _attacking ? Config.attack : new Color32(0x30, 0x34, 0x3A, 0xFF);
-            _arrowHead.transform.localScale = _attacking ? new Vector3(0.42f, 0.32f, 1f) : new Vector3(0.26f, 0.2f, 1f);
+            _arrowHead.startColor = _arrowHead.endColor = _attacking ? Config.attack : Config.ink;
+            _arrowHead.widthMultiplier = (_attacking ? 0.34f : 0.2f) * _arrowScale;
             foreach (var part in _arrowParts) part.enabled = !blink;
+            if (!Mathf.Approximately(_lastArrowScale, _arrowScale))
+            {
+                // El grosor de las líneas no escala con el transform: se ajusta a mano
+                for (int i = 0; i < _arrowParts.Length; i++)
+                    if (_arrowParts[i] != _arrowHead) _arrowParts[i].widthMultiplier = _arrowBaseWidths[i] * _arrowScale;
+                _lastArrowScale = _arrowScale;
+            }
             _trail.emitting = _state == State.Launch || _state == State.Flight || _state == State.Falling;
             _trail.widthMultiplier = (_attacking ? 2.4f : 1f) * _arrowScale;
             Color tc = _attacking ? Config.attack : Config.ink;
@@ -562,42 +578,37 @@ namespace ArrowBlaster
         // Salpicadura de tinta: manchas que salen despedidas y se desvanecen, y una mancha que queda un momento
         private void Splash(Vector2 at, Color color, int count, float power)
         {
+            // Latigazos de pincel que salen del punto de impacto
             for (int i = 0; i < count; i++)
             {
-                float size = Random.Range(0.12f, 0.42f) * power;
-                var sr = Gfx.Shape("Ink", Gfx.Circle, _world, at, Vector2.one * size, color, 20);
-                sr.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
-                StartCoroutine(Fade(sr, Random.insideUnitCircle.normalized * Random.Range(2f, 7f) * power, Random.Range(0.35f, 0.65f)));
+                Vector2 dir = Random.insideUnitCircle.normalized;
+                float len = Random.Range(0.3f, 1.1f) * power;
+                var lr = Brush.Line("Flick", _world, at + dir * 0.15f, at + dir * (0.15f + len), Random.Range(0.05f, 0.14f) * power, color, 20, 0.15f, 0.9f);
+                StartCoroutine(Fade(lr, dir * Random.Range(1f, 3f) * power, Random.Range(0.35f, 0.65f)));
             }
-            var stain = Gfx.Shape("Stain", Gfx.Circle, _world, at, Vector2.one * 0.9f * power, new Color(color.r, color.g, color.b, 0.55f), 3);
-            stain.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
-            StartCoroutine(Fade(stain, Vector2.zero, 1.4f));
         }
 
         // Gota de tinta que deja la flecha al volar
         private void Drop(Vector2 at, Color color)
         {
-            var sr = Gfx.Shape("Drop", Gfx.Circle, _world, at + Random.insideUnitCircle * 0.06f, Vector2.one * Random.Range(0.07f, 0.16f),
-                new Color(color.r, color.g, color.b, 0.7f), 7);
-            StartCoroutine(Fade(sr, Vector2.down * Random.Range(0.1f, 0.5f), Random.Range(0.5f, 0.9f)));
+            var lr = Brush.Dab("Drop", _world, at + Random.insideUnitCircle * 0.06f, Random.Range(0.06f, 0.14f), color, 7);
+            StartCoroutine(Fade(lr, Vector2.down * Random.Range(0.1f, 0.5f), Random.Range(0.5f, 0.9f)));
         }
 
-        private IEnumerator Fade(SpriteRenderer sr, Vector2 v, float life)
+        private IEnumerator Fade(LineRenderer lr, Vector2 v, float life)
         {
             float t = 0f;
-            Color c = sr.color;
-            Vector3 scale = sr.transform.localScale;
-            while (t < life && sr != null)
+            Color c = lr.startColor;
+            while (t < life && lr != null)
             {
                 t += Time.deltaTime;
                 v *= 1f - 4f * Time.deltaTime;
-                sr.transform.position += (Vector3)(v * Time.deltaTime);
+                lr.transform.position += (Vector3)(v * Time.deltaTime);
                 float k = t / life;
-                sr.color = new Color(c.r, c.g, c.b, c.a * (1f - k * k));
-                sr.transform.localScale = scale * (1f + k * 0.25f);
+                lr.startColor = lr.endColor = new Color(c.r, c.g, c.b, c.a * (1f - k * k));
                 yield return null;
             }
-            if (sr != null) Destroy(sr.gameObject);
+            if (lr != null) Destroy(lr.gameObject);
         }
 
         // ───────────────────────── Pausa ─────────────────────────

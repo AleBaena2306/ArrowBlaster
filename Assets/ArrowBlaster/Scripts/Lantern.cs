@@ -2,8 +2,8 @@ using UnityEngine;
 
 namespace ArrowBlaster
 {
-    // Objetivo del lanzamiento: farolillo rojo de papel (chōchin) colgado de una cuerda, que sube y baja.
-    // Atravesar el emblema central = PERFECT; el resto del farolillo = GOOD.
+    // Objetivo del lanzamiento: ensō de tinta colgado de una cuerda, que sube y baja.
+    // Atravesar el toque rojo del centro = PERFECT; el resto del círculo = GOOD.
     public sealed class Lantern : MonoBehaviour
     {
         private ArrowConfig _cfg;
@@ -37,7 +37,7 @@ namespace ArrowBlaster
             _rope = new GameObject("Rope").AddComponent<LineRenderer>();
             _rope.transform.SetParent(transform.parent, false);
             _rope.positionCount = 2;
-            _rope.widthMultiplier = 0.07f;
+            _rope.widthMultiplier = 0.045f;
             _rope.startColor = _rope.endColor = _cfg.ink;
             _rope.sortingOrder = 2;
             InkArt.Apply(_rope);
@@ -45,22 +45,9 @@ namespace ArrowBlaster
             _body = new GameObject("Body").transform;
             _body.SetParent(transform, false);
 
-            // Cuerpo: mancha roja ovalada, tres costillas de tinta, tapas y borla
-            Gfx.Shape("Paper", Gfx.Circle, _body, Vector2.zero, new Vector2(r * 1.7f, r * 2.05f), red, 4);
-            for (int i = -1; i <= 1; i++)
-            {
-                float y = i * r * 0.55f;
-                float w = Mathf.Sqrt(Mathf.Max(0f, 1f - (y / r) * (y / r))) * r * 1.5f;
-                Gfx.Shape("Rib", Gfx.Square, _body, new Vector2(0f, y), new Vector2(w, 0.06f), new Color(0f, 0f, 0f, 0.35f), 5);
-            }
-            Gfx.Shape("CapTop", Gfx.Square, _body, new Vector2(0f, r * 1.0f), new Vector2(r * 1.0f, 0.22f), _cfg.ink, 9);
-            Gfx.Shape("CapBottom", Gfx.Square, _body, new Vector2(0f, -r * 1.0f), new Vector2(r * 1.0f, 0.22f), _cfg.ink, 9);
-            Gfx.Shape("Tassel", Gfx.Square, _body, new Vector2(0f, -r * 1.42f), new Vector2(0.12f, 0.7f), _cfg.ink, 9);
-
-            // Emblema central (zona de acierto perfecto): anillo de tinta con el centro de papel
-            float c = _cfg.lanternCenterRadius;
-            Gfx.Shape("MonRing", Gfx.Circle, _body, Vector2.zero, Vector2.one * c * 2.3f, _cfg.ink, 7);
-            Gfx.Shape("MonPaper", Gfx.Circle, _body, Vector2.zero, Vector2.one * c * 1.8f, _cfg.paper, 8);
+            // Objetivo: ensō de tinta (acierto normal) y un toque rojo en el centro (acierto perfecto)
+            Brush.Enso("Enso", _body, Vector2.zero, r * 0.9f, 0.3f, _cfg.ink, 5, 330f);
+            Brush.Dab("Center", _body, Vector2.zero, _cfg.lanternCenterRadius * 2f, red, 7);
         }
 
         // El acierto hace que el farolillo se balancee y dé un pequeño bote

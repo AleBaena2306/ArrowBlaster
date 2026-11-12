@@ -7,7 +7,7 @@ namespace ArrowBlaster
     // Reglas:
     //  - Chocar sin atacar: quita una vida (pilares, enemigos, proyectiles).
     //  - Chocar atacando: rompe lo que toca y cuesta fuerza.
-    //  - Las dianas pequeñas no hacen daño: solo se rompen atacando y dan monedas.
+    //  - Los toques dorados no hacen daño: dan monedas al tocarlos.
     // Estilo: tinta negra sobre papel; lo peligroso, en color.
     public abstract class Obstacle : MonoBehaviour
     {
@@ -36,13 +36,7 @@ namespace ArrowBlaster
             return (a - b).sqrMagnitude <= d * d;
         }
 
-        // Mancha redonda de color (el shader de tinta le da el borde irregular)
-        protected SpriteRenderer Dab(Transform parent, Vector2 pos, float size, Color color, int order)
-        {
-            var body = Gfx.Shape("Body", Gfx.Circle, parent, pos, Vector2.one * size, color, order);
-            body.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
-            return body;
-        }
+
     }
 
     // Dos trazos verticales de color con un hueco: hay que pasar por el hueco o romperlos atacando.
@@ -68,10 +62,10 @@ namespace ArrowBlaster
             root.SetParent(transform, false);
             root.position = r.center;
 
-            // Trazo de color (vertical) y remate de tinta en el extremo que da al hueco
-            Gfx.Shape("Stroke", Gfx.Square, root, Vector2.zero, r.size, Cfg.danger, 6);
-            float capY = (capAtBottom ? -1f : 1f) * (r.height * 0.5f - 0.1f);
-            Gfx.Shape("Cap", Gfx.Square, root, new Vector2(0f, capY), new Vector2(r.width + 0.7f, 0.26f), Cfg.ink, 8);
+            // Pincelada vertical de color que nace en el borde de la pantalla y se seca en el hueco
+            float h = r.height * 0.5f;
+            Vector2 gapEnd = new Vector2(0f, capAtBottom ? -h : h), farEnd = -gapEnd;
+            Brush.Line("Stroke", root, farEnd, gapEnd, r.width * 1.25f, Cfg.danger, 6, bend: 0.02f, dry: 0.9f);
             _parts.Add((root, r));
         }
 
@@ -100,24 +94,12 @@ namespace ArrowBlaster
         {
             _baseY = transform.position.y;
             _phase = Random.value * 10f;
-            _body = new GameObject("Oni").transform;
+            _body = new GameObject("Enemy").transform;
             _body.SetParent(transform, false);
-
-            // Cuernos
-            var hornL = Gfx.Shape("HornL", Gfx.Triangle, _body, new Vector2(-0.28f, 0.62f), new Vector2(0.34f, 0.2f), Cfg.ink, 4);
-            hornL.transform.localRotation = Quaternion.Euler(0, 0, 110f);
-            var hornR = Gfx.Shape("HornR", Gfx.Triangle, _body, new Vector2(0.28f, 0.62f), new Vector2(0.34f, 0.2f), Cfg.ink, 4);
-            hornR.transform.localRotation = Quaternion.Euler(0, 0, 70f);
-
-            Dab(_body, Vector2.zero, Radius * 2f, Cfg.enemy, 5);
-
-            // Ojos que siguen a la flecha
-            Gfx.Shape("EyeL", Gfx.Circle, _body, new Vector2(-0.2f, 0.12f), Vector2.one * 0.3f, Cfg.paper, 8);
-            Gfx.Shape("EyeR", Gfx.Circle, _body, new Vector2(0.14f, 0.12f), Vector2.one * 0.26f, Cfg.paper, 8);
-            _pupilL = Gfx.Shape("PupilL", Gfx.Circle, _body, new Vector2(-0.2f, 0.12f), Vector2.one * 0.13f, Cfg.ink, 9).transform;
-            _pupilR = Gfx.Shape("PupilR", Gfx.Circle, _body, new Vector2(0.14f, 0.12f), Vector2.one * 0.12f, Cfg.ink, 9).transform;
-            // Boca
-            Gfx.Shape("Mouth", Gfx.Square, _body, new Vector2(-0.04f, -0.22f), new Vector2(0.4f, 0.08f), Cfg.ink, 8);
+            // Ensō de color y dos toques de tinta como ojos
+            Brush.Enso("Ring", _body, Vector2.zero, Radius * 0.85f, 0.32f, Cfg.enemy, 5, 340f);
+            _pupilL = Brush.Dab("EyeL", _body, new Vector2(-0.18f, 0.08f), 0.16f, Cfg.ink, 8).transform;
+            _pupilR = Brush.Dab("EyeR", _body, new Vector2(0.14f, 0.08f), 0.14f, Cfg.ink, 8).transform;
 
             _fireTimer = Cfg.enemyFireInterval * 0.5f;
         }
@@ -131,8 +113,8 @@ namespace ArrowBlaster
             _body.localScale = new Vector3(1f + Mathf.Sin(_phase * 4.8f) * 0.04f, 1f - Mathf.Sin(_phase * 4.8f) * 0.04f, 1f);
 
             Vector2 look = ((Vector2)Game.ArrowPosition - (Vector2)p).normalized * 0.06f;
-            _pupilL.localPosition = new Vector2(-0.2f, 0.12f) + look;
-            _pupilR.localPosition = new Vector2(0.14f, 0.12f) + look;
+            _pupilL.localPosition = look;
+            _pupilR.localPosition = look;
 
             float ahead = p.x - Game.ArrowPosition.x;
             if (ahead < 1f || ahead > Cfg.enemyRange) return;
@@ -159,13 +141,13 @@ namespace ArrowBlaster
 
         protected override void Build()
         {
-            Dab(transform, Vector2.zero, Radius * 2.2f, Cfg.enemy, 7);
+            Brush.Line("Dash", transform, new Vector2(-Radius * 1.4f, 0f), new Vector2(Radius * 1.4f, 0f), Radius * 1.3f, Cfg.enemy, 7, bend: 0.1f, dry: 0.5f);
         }
 
         public override void Tick(float dt)
         {
             transform.position += Vector3.left * (Cfg.projectileSpeed * dt);
-            transform.Rotate(0f, 0f, 200f * dt);
+
         }
 
         public override bool CheckHit(Vector2 tip, float radius, bool attacking)
@@ -177,7 +159,7 @@ namespace ArrowBlaster
         }
     }
 
-    // Grupo de dianas pequeñas (mato): no hacen daño; romperlas atacando da monedas.
+    // Grupo de toques dorados: dan monedas al tocarlos (sin necesidad de atacar) y no hacen daño.
     public sealed class TargetCluster : Obstacle
     {
         private const float Radius = 0.38f;
@@ -196,10 +178,7 @@ namespace ArrowBlaster
                 var t = new GameObject("Target").transform;
                 t.SetParent(transform, false);
                 t.localPosition = new Vector2(i * 1.1f, dy);
-                Gfx.Shape("Ink", Gfx.Circle, t, Vector2.zero, Vector2.one * Radius * 2f, Cfg.ink, 5);
-                Gfx.Shape("Paper", Gfx.Circle, t, Vector2.zero, Vector2.one * Radius * 1.5f, Cfg.paper, 6);
-                Gfx.Shape("Ring", Gfx.Circle, t, Vector2.zero, Vector2.one * Radius * 1.05f, Cfg.ink, 7);
-                Gfx.Shape("Gold", Gfx.Circle, t, Vector2.zero, Vector2.one * Radius * 0.7f, Cfg.reward, 8);
+                Brush.Dab("Gold", t, Vector2.zero, Radius * 1.4f, Cfg.reward, 6);
                 _targets.Add(t);
             }
         }
@@ -213,11 +192,10 @@ namespace ArrowBlaster
 
         public override bool CheckHit(Vector2 tip, float radius, bool attacking)
         {
-            if (!attacking) return false;
             for (int i = _targets.Count - 1; i >= 0; i--)
             {
                 if (!CircleCircle(tip, radius, _targets[i].position, Radius)) continue;
-                Game.Break(_targets[i].position, 0f, Cfg.coinsPerTarget, Cfg.reward);
+                Game.Collect(_targets[i].position, Cfg.coinsPerTarget);
                 Destroy(_targets[i].gameObject);
                 _targets.RemoveAt(i);
             }

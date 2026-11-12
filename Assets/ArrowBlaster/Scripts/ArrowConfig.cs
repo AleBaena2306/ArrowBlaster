@@ -106,9 +106,9 @@ namespace ArrowBlaster
         public int coinsPerWall = 3;
 
         [Header("Colores (tinta en blanco y negro; lo peligroso en color)")]
-        public Color paper = new Color32(0xEF, 0xE9, 0xDD, 0xFF);
-        public Color ink = new Color32(0x16, 0x16, 0x16, 0xFF);
-        public Color inkSoft = new Color32(0x16, 0x16, 0x16, 0x40);
+        public Color paper = new Color32(0xFA, 0xF8, 0xF3, 0xFF);
+        public Color ink = new Color32(0x05, 0x05, 0x05, 0xFF);
+        public Color inkSoft = new Color32(0x05, 0x05, 0x05, 0x50);
         public Color danger = new Color32(0xD7, 0x26, 0x3D, 0xFF);
         public Color enemy = new Color32(0x2A, 0x7F, 0xD4, 0xFF);
         public Color reward = new Color32(0xE8, 0xA3, 0x17, 0xFF);
