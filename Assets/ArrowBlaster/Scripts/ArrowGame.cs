@@ -35,7 +35,6 @@ namespace ArrowBlaster
         private Boss _boss;
         private bool _bossDone;
         private float _attackTimer, _attackCooldown;
-        private bool _attackSpent;
         private float ZoneLength => Config.zoneLengths[Mathf.Clamp(_zone, 0, Config.zoneLengths.Length - 1)];
         private readonly List<Obstacle> _obstacles = new List<Obstacle>();
         private float _nextSpawnX;
@@ -100,7 +99,6 @@ namespace ArrowBlaster
             _boss = null;
             _bossDone = false;
             _attackTimer = _attackCooldown = 0f;
-            _attackSpent = false;
             _state = State.Aim;
             _hud.ShowRun(_lives);
             _hud.SetHint("Drag back to aim · Release to shoot");
@@ -131,6 +129,7 @@ namespace ArrowBlaster
             else _hud.SetProgress(Mathf.Clamp01(_pos.x / ZoneLength), false, Save.Loop > 0 ? $"ZONE {_zone + 1} · NG+{Save.Loop}" : $"ZONE {_zone + 1}");
             _hud.Tick(_force, _state == State.Aim ? 1f : _startForce, _pos.x, Save.Coins + _runCoins,
                 draining: _attacking && _state == State.Flight, aiming: _state == State.Aim);
+            _hud.SetAttackZone(_state == State.Flight && !_paused, Config.attackZone);
         }
 
         private bool _pressedThisFrame, _releasedThisFrame;
@@ -143,7 +142,30 @@ namespace ArrowBlaster
             if (down) _pressed = true;
             _releasedThisFrame = _pressed && !held;
             if (!held) _pressed = false;
+
+            // En vuelo: tocar la franja izquierda (attackZone) = golpe; el resto de la pantalla = impulso.
+            // Teclado: Espacio = impulso; Shift, X o Z = golpe.
+            _flapPressed = Input.GetKeyDown(KeyCode.Space);
+            _attackPressed = Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift)
+                             || Input.GetKeyDown(KeyCode.X) || Input.GetKeyDown(KeyCode.Z);
+            float edge = Screen.width * Config.attackZone;
+            if (Input.touchCount > 0)
+            {
+                for (int i = 0; i < Input.touchCount; i++)
+                {
+                    var t = Input.GetTouch(i);
+                    if (t.phase != TouchPhase.Began) continue;
+                    if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(t.fingerId)) continue;
+                    if (t.position.x < edge) _attackPressed = true; else _flapPressed = true;
+                }
+            }
+            else if (Input.GetMouseButtonDown(0) && !PointerOverUi())
+            {
+                if (Input.mousePosition.x < edge) _attackPressed = true; else _flapPressed = true;
+            }
         }
+
+        private bool _flapPressed, _attackPressed;
 
         private static bool PointerOverUi()
         {
@@ -290,7 +312,7 @@ namespace ArrowBlaster
             _attacking = false;
             _vel = new Vector2(Speed(), Mathf.Clamp(_vel.y, -3f, 5f));
             _state = State.Flight;
-            _hud.SetHint("Tap to fly · Hold to attack");
+            _hud.SetHint("Tap right to fly · Tap the red edge to attack");
             StartCoroutine(HideHintLater(3f));
         }
 
@@ -309,21 +331,17 @@ namespace ArrowBlaster
         private void UpdateFlight(float dt)
         {
             // Entrada: tocar = impulso; mantener = atacar (planeo)
-            // Tocar (soltar antes del umbral) = impulso. Mantener = un golpe de duración fija;
-            // para dar otro hay que soltar y esperar un momento.
-            if (_releasedThisFrame && _holdTime < Config.holdThreshold) _vel.y = Config.flapVelocity;
-            if (_pressedThisFrame) _holdTime = 0f;
-            if (_pressed) _holdTime += dt; else { _holdTime = 0f; _attackSpent = false; }
+            // Impulso al tocar la derecha; golpe de duración fija al tocar la franja roja de la izquierda
+            if (_flapPressed) _vel.y = Config.flapVelocity;
             if (_attackCooldown > 0f) _attackCooldown -= dt;
             if (_attackTimer > 0f)
             {
                 _attackTimer -= dt;
                 if (_attackTimer <= 0f) _attackCooldown = Config.attackCooldown;
             }
-            else if (_pressed && !_attackSpent && _attackCooldown <= 0f && _holdTime >= Config.holdThreshold)
+            else if (_attackPressed && _attackCooldown <= 0f)
             {
                 _attackTimer = Config.attackDuration;
-                _attackSpent = true;
                 _force = Mathf.Max(0f, _force - Config.attackForceCost * Upgrades.AttackCostMultiplier);
                 _shake = Mathf.Max(_shake, 0.08f);
             }

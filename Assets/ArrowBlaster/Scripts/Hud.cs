@@ -60,8 +60,21 @@ namespace ArrowBlaster
             Build();
         }
 
+        private Image _attackZone;
+
         private void Build()
         {
+            // Franja de ataque: rojo que se desvanece de izquierda (opaco) a derecha (transparente). Va por debajo del resto.
+            var grad = new Texture2D(64, 1, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            for (int x = 0; x < 64; x++) grad.SetPixel(x, 0, new Color(1f, 1f, 1f, 1f - x / 63f));
+            grad.Apply();
+            _attackZone = new GameObject("AttackZone", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+            _attackZone.rectTransform.SetParent(_root, false);
+            _attackZone.sprite = Sprite.Create(grad, new Rect(0, 0, 64, 1), new Vector2(0.5f, 0.5f));
+            _attackZone.color = new Color(_cfg.attack.r, _cfg.attack.g, _cfg.attack.b, 0.22f);
+            _attackZone.raycastTarget = false;
+            _attackZone.enabled = false;
+
             // Barra de fuerza (arriba a la izquierda): trazo de pincel que se vacía
             var bar = Box("ForceBar", _root, new Vector2(0, 1), new Vector2(60, -70), new Vector2(540, 64), new Color(_cfg.ink.r, _cfg.ink.g, _cfg.ink.b, 0.18f));
             _forceBar = bar;
@@ -142,6 +155,16 @@ namespace ArrowBlaster
         }
 
         public void SetHint(string text) => _hint.text = text;
+
+        public void SetAttackZone(bool visible, float width)
+        {
+            _attackZone.enabled = visible;
+            if (!visible) return;
+            var rt = _attackZone.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = new Vector2(width, 1f);
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+        }
 
         // t = avance hacia el jefe (0-1) o, en combate, vida que le queda
         public void SetProgress(float t, bool bossFight, string label)
