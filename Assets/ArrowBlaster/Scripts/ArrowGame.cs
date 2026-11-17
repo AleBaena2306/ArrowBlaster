@@ -22,13 +22,14 @@ namespace ArrowBlaster
         private Camera _cam;
         private Transform _world;
         private Transform _arrow;
-        private LineRenderer _arrowHead;
+        private SpriteRenderer _arrowOutline, _arrowFill;
         private Renderer[] _arrowRenderers;
         private TrailRenderer _trail;
         private Bow _bow;
         private Lantern _lantern;
         private readonly List<SpriteRenderer> _aimDots = new List<SpriteRenderer>();
         private float _dropTimer;
+        private Scenery _scenery;
 
         // Zonas y jefes
         private int _zone;
@@ -65,7 +66,8 @@ namespace ArrowBlaster
             Application.targetFrameRate = 60;
             SetupCamera();
             EnsureEventSystem();
-            Scenery.Create(_cam, Config);
+            Art.P = Config.Palette(Mathf.Clamp(Save.Zone, 0, Config.zoneLengths.Length - 1));
+            _scenery = Scenery.Create(_cam, Config);
             _hud = new Hud(this, Config);
         }
 
@@ -78,6 +80,10 @@ namespace ArrowBlaster
             if (_world != null) Destroy(_world.gameObject);
             _obstacles.Clear();
             _world = new GameObject("World").transform;
+
+            // Cada zona tiene su paleta: se aplica antes de construir nada
+            Art.P = Config.Palette(Mathf.Clamp(Save.Zone, 0, Config.zoneLengths.Length - 1));
+            _scenery.SetPalette(Art.P);
 
             BuildLaunchArea();
             BuildArrow();
@@ -180,7 +186,7 @@ namespace ArrowBlaster
         // Arco gigante fijo: se arrastra hacia atrás (como un tirachinas) para apuntar y tensar; al soltar, dispara.
         // La línea de puntos muestra la trayectoria. Atravesar el farolillo multiplica la fuerza de la run.
         // En ordenador también: mantener Espacio tensa y las flechas arriba/abajo cambian el ángulo.
-        private const float ArrowTail = 1.12f;   // distancia del centro de la flecha a su culatín (escala 1)
+        private const float ArrowTail = 0.3f;    // distancia del centro del puntero a su base (escala 1)
 
         private Vector2 PointerWorld() => _cam.ScreenToWorldPoint(Input.mousePosition);
 
@@ -251,7 +257,7 @@ namespace ArrowBlaster
                 d.transform.position = p;
                 float t = i / (float)_aimDots.Count;
                 d.transform.localScale = Vector3.one * Mathf.Lerp(0.22f, 0.1f, t);
-                d.color = new Color(Config.ink.r, Config.ink.g, Config.ink.b, Mathf.Lerp(0.55f, 0.15f, t));
+                d.color = new Color(1f, 1f, 1f, Mathf.Lerp(0.9f, 0.25f, t));
             }
         }
 
@@ -300,12 +306,12 @@ namespace ArrowBlaster
             _force = Mathf.Min(Config.initialForce * Upgrades.PowerMultiplier * multiplier * Mathf.Lerp(0.7f, 1f, _launchDraw), Config.maxForce);
             _startForce = Mathf.Max(1f, _force);
             bool perfect = label == "PERFECT";
-            _hud.Toast($"{label}  ×{multiplier:0.0}", perfect ? Config.attack : Config.ink);
+            _hud.Toast($"{label}  ×{multiplier:0.0}", perfect ? Config.reward : Config.uiInk);
             if (hitLantern)
             {
                 _lantern.Hit(perfect);
-                Splash(_pos, new Color32(0xC8, 0x10, 0x2E, 0xFF), perfect ? 10 : 5, perfect ? 1.3f : 0.9f);
-                Splash(_pos, Config.ink, perfect ? 10 : 5, 1f);
+                Splash(_pos, new Color32(0xFF, 0x4D, 0x5E, 0xFF), perfect ? 10 : 5, perfect ? 1.3f : 0.9f);
+                Splash(_pos, Color.white, perfect ? 10 : 5, 1f);
                 _shake = perfect ? 0.3f : 0.18f;
                 StartCoroutine(HitStop(perfect ? 0.08f : 0.04f));
             }
@@ -366,10 +372,10 @@ namespace ArrowBlaster
             if (_invulnerable > 0f) _invulnerable -= dt;
 
             _dropTimer -= dt;
-            if (_dropTimer <= 0f)
+            if (_dropTimer <= 0f && _attacking)
             {
-                _dropTimer = _attacking ? 0.035f : 0.1f;
-                Drop(_pos - _vel.normalized * ArrowTail * _arrowScale, Config.ink);
+                _dropTimer = 0.03f;
+                Drop(_pos - _vel.normalized * ArrowTail * _arrowScale, Art.P.trail);
             }
 
             SpawnAhead();
@@ -408,7 +414,7 @@ namespace ArrowBlaster
                 if (_obstacles[i] != null) _obstacles[i].Tick(dt);
             if (_pos.y > Config.groundY) return;
             _pos.y = Config.groundY;
-            Splash(_pos, Config.ink, 8, 1f);
+            Splash(_pos, Color.white, 8, 1f);
             _shake = 0.2f;
             EndRun();
         }
@@ -443,7 +449,7 @@ namespace ArrowBlaster
             _runCoins += coins;
             _shake = Mathf.Max(_shake, 0.15f);
             Splash(at, color, 10, 1.1f);
-            Splash(at, Config.ink, 6, 0.8f);
+            Splash(at, Color.white, 6, 0.8f);
             if (coins > 0) _hud.Toast($"+{coins}", Config.reward, small: true);
             StartCoroutine(HitStop(0.035f));
         }
@@ -488,7 +494,7 @@ namespace ArrowBlaster
             _boss = null;
             _nextSpawnX = _pos.x + 25f;
             Splash(boss.transform.position, Config.attack, 18, 2f);
-            Splash(boss.transform.position, Config.ink, 14, 1.6f);
+            Splash(boss.transform.position, Color.white, 14, 1.6f);
             _shake = 0.6f;
             StartCoroutine(HitStop(0.15f));
             _hud.Toast($"BOSS DEFEATED!  +{reward}", Config.attack);
@@ -505,7 +511,7 @@ namespace ArrowBlaster
             else
             {
                 _force = Mathf.Max(0f, _force - Config.pickupForce);
-                Splash(at, Config.ink, 5, 0.6f);
+                Splash(at, Color.white, 5, 0.6f);
                 _shake = Mathf.Max(_shake, 0.12f);
             }
         }
@@ -588,7 +594,7 @@ namespace ArrowBlaster
             _cam.orthographic = true;
             _cam.orthographicSize = Config.cameraSize;
             _cam.clearFlags = CameraClearFlags.SolidColor;
-            _cam.backgroundColor = Config.paper;
+            _cam.backgroundColor = Art.P.skyBottom;
             _cam.transform.position = new Vector3(Config.aimCameraX, 0f, -10f);
         }
 
@@ -612,7 +618,7 @@ namespace ArrowBlaster
             _aimDots.Clear();
             for (int i = 0; i < 16; i++)
             {
-                var d = Gfx.Shape("AimDot", Gfx.Circle, _world, Vector2.zero, Vector2.one * 0.16f, Config.inkSoft, 15);
+                var d = Art.Shape("circle", _world, Vector2.zero, 0.16f, Color.white, 15);
                 d.enabled = false;
                 _aimDots.Add(d);
             }
@@ -622,21 +628,21 @@ namespace ArrowBlaster
         {
             _arrow = new GameObject("Arrow").transform;
             _arrow.SetParent(_world, false);
-            // Flecha de Kenney (item_arrow, punta a la derecha) en tinta; la punta roja solo aparece al atacar
-            // En la imagen: cola en x = 15 px, punta en x = 113 px (98 px = 1,74 unidades a escala 1)
-            KenneyArt.Shape("item_arrow", _arrow, Vector2.zero, 128f / 56.3f, Config.ink, 11, pivot: new Vector2(78f / 128f, 0.5f));
-            var point = new AnimationCurve(new Keyframe(0f, 0.3f), new Keyframe(0.35f, 1f), new Keyframe(1f, 0.05f));
-            _arrowHead = Brush.Stroke("Head", _arrow, new Vector3[] { new Vector3(0.38f, 0f), new Vector3(0.5f, 0f), new Vector3(0.66f, 0f) },
-                0.14f, Config.attack, 12, 0.3f, point, 0.01f);
+            // Puntero hipercasual (ShapeForge): triángulo con contorno del color de la estela.
+            // La punta queda a 0,55 del centro (radio del contorno = 116/256 del alto del sprite).
+            const float size = 0.55f * 256f / 116f;
+            _arrowOutline = Art.Shape("pointer_outline", _arrow, Vector2.zero, size, Art.P.trail, 11);
+            _arrowFill = Art.Shape("pointer_fill", _arrow, Vector2.zero, size, Art.P.pointer, 12);
             _arrowRenderers = _arrow.GetComponentsInChildren<Renderer>();
 
+            // Estela: cinta ancha que se afila y se desvanece
             _trail = _arrow.gameObject.AddComponent<TrailRenderer>();
-            InkArt.Apply(_trail, dry: 0.45f, wobble: 0.02f);
-            _trail.time = 0.6f;
+            _trail.sharedMaterial = Art.LineMaterial;
+            _trail.time = 0.45f;
             _trail.minVertexDistance = 0.05f;
-            _trail.numCapVertices = 3;
-            _trail.widthCurve = new AnimationCurve(new Keyframe(0f, 0.16f), new Keyframe(0.25f, 0.13f), new Keyframe(1f, 0.02f));
-            _trail.sortingOrder = 8;
+            _trail.numCapVertices = 6;
+            _trail.widthCurve = new AnimationCurve(new Keyframe(0f, 0.62f), new Keyframe(0.3f, 0.45f), new Keyframe(1f, 0f));
+            _trail.sortingOrder = 9;
             _trail.emitting = false;
         }
 
@@ -657,15 +663,16 @@ namespace ArrowBlaster
             _arrow.rotation = Quaternion.Euler(0f, 0f, angle);
 
             bool blink = _invulnerable > 0f && Mathf.Repeat(Time.time * 12f, 1f) < 0.5f;
-            _arrowHead.widthMultiplier = 0.14f * _arrowScale;
             foreach (var part in _arrowRenderers)
-                if (!(part is TrailRenderer)) part.enabled = !blink && (part != _arrowHead || _attacking);
+                if (!(part is TrailRenderer)) part.enabled = !blink;
+            // Al atacar, el relleno se pone rojo (solo la cabeza) y la estela se ensancha
+            _arrowFill.color = _attacking ? Config.attack : Art.P.pointer;
+            _arrowOutline.color = Art.P.trail;
             _trail.emitting = _state == State.Launch || _state == State.Flight || _state == State.Falling;
-            _trail.widthMultiplier = (_attacking ? 1.6f : 1f) * _arrowScale;
-            Color tc = Config.ink; // la estela siempre es de tinta: solo la punta se pone roja al atacar
-            _trail.startColor = new Color(tc.r, tc.g, tc.b, 0.9f);
+            _trail.widthMultiplier = (_attacking ? 1.35f : 1f) * _arrowScale;
+            Color tc = Art.P.trail;
+            _trail.startColor = new Color(tc.r, tc.g, tc.b, 0.95f);
             _trail.endColor = new Color(tc.r, tc.g, tc.b, 0f);
-
         }
 
         private void UpdateCamera(float dt)
@@ -683,29 +690,28 @@ namespace ArrowBlaster
             _cam.transform.position = p;
         }
 
-        // Salpicadura de tinta: manchas que salen despedidas y se desvanecen, y una mancha que queda un momento
+        // Estallido hipercasual: un aro que se expande y bolitas que salen despedidas encogiéndose
         private void Splash(Vector2 at, Color color, int count, float power)
         {
-            // Estallido de Kenney (effect_blast) y latigazos de pincel que salen del punto de impacto
-            var blast = KenneyArt.Shape("effect_blast", _world, at, 1.1f * power, color, 19, keepColor: false);
-            StartCoroutine(Pop(blast, 0.3f));
+            var ring = Art.Shape("ring", _world, at, 0.6f * power, color, 19);
+            StartCoroutine(Pop(ring, 0.3f, 2.4f));
             for (int i = 0; i < count; i++)
             {
                 Vector2 dir = Random.insideUnitCircle.normalized;
-                float len = Random.Range(0.3f, 1.1f) * power;
-                var lr = Brush.Line("Flick", _world, at + dir * 0.15f, at + dir * (0.15f + len), Random.Range(0.05f, 0.14f) * power, color, 20, 0.15f, 0.9f);
-                StartCoroutine(Fade(lr, dir * Random.Range(1f, 3f) * power, Random.Range(0.35f, 0.65f)));
+                var dot = Art.Shape(i % 3 == 0 ? "spark" : "circle", _world, at + dir * 0.2f, Random.Range(0.12f, 0.3f) * power, color, 20);
+                StartCoroutine(Fly(dot, dir * Random.Range(3f, 7f) * power, Random.Range(0.3f, 0.55f)));
             }
         }
 
-        // Gota de tinta que deja la flecha al volar
+        // Bolitas de la estela al atacar
         private void Drop(Vector2 at, Color color)
         {
-            var lr = Brush.Dab("Drop", _world, at + Random.insideUnitCircle * 0.06f, Random.Range(0.06f, 0.14f), color, 7);
-            StartCoroutine(Fade(lr, Vector2.down * Random.Range(0.1f, 0.5f), Random.Range(0.5f, 0.9f)));
+            var dot = Art.Shape("circle", _world, at + Random.insideUnitCircle * 0.15f, Random.Range(0.08f, 0.18f), color, 7);
+            StartCoroutine(Fly(dot, Random.insideUnitCircle * 0.8f, Random.Range(0.3f, 0.5f)));
         }
 
-        private IEnumerator Pop(SpriteRenderer sr, float life)
+        // Escala de 0,4 a «grow» y se desvanece
+        private IEnumerator Pop(SpriteRenderer sr, float life, float grow)
         {
             float t = 0f;
             Vector3 s0 = sr.transform.localScale;
@@ -714,27 +720,28 @@ namespace ArrowBlaster
             {
                 t += Time.deltaTime;
                 float k = t / life;
-                sr.transform.localScale = s0 * (0.6f + 0.7f * Mathf.Sqrt(k));
+                sr.transform.localScale = s0 * Mathf.Lerp(0.4f, grow, 1f - (1f - k) * (1f - k));
                 sr.color = new Color(c.r, c.g, c.b, 1f - k);
                 yield return null;
             }
             if (sr != null) Destroy(sr.gameObject);
         }
 
-        private IEnumerator Fade(LineRenderer lr, Vector2 v, float life)
+        // Sale despedida, frena y encoge hasta desaparecer
+        private IEnumerator Fly(SpriteRenderer sr, Vector2 v, float life)
         {
             float t = 0f;
-            Color c = lr.startColor;
-            while (t < life && lr != null)
+            Vector3 s0 = sr.transform.localScale;
+            while (t < life && sr != null)
             {
                 t += Time.deltaTime;
-                v *= 1f - 4f * Time.deltaTime;
-                lr.transform.position += (Vector3)(v * Time.deltaTime);
-                float k = t / life;
-                lr.startColor = lr.endColor = new Color(c.r, c.g, c.b, c.a * (1f - k * k));
+                v *= 1f - 5f * Time.deltaTime;
+                sr.transform.position += (Vector3)(v * Time.deltaTime);
+                sr.transform.Rotate(0f, 0f, 360f * Time.deltaTime);
+                sr.transform.localScale = s0 * (1f - t / life);
                 yield return null;
             }
-            if (lr != null) Destroy(lr.gameObject);
+            if (sr != null) Destroy(sr.gameObject);
         }
 
         // ───────────────────────── Pausa ─────────────────────────

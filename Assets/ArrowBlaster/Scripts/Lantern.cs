@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace ArrowBlaster
 {
-    // Objetivo del lanzamiento: diana colgada de una cuerda, que sube y baja.
+    // Objetivo del lanzamiento: diana colgada de un hilo, que sube y baja.
     // Atravesar el centro = PERFECT; el resto de la diana = GOOD.
     public sealed class Lantern : MonoBehaviour
     {
@@ -31,23 +31,16 @@ namespace ArrowBlaster
         private void Build()
         {
             float r = _cfg.lanternRadius;
-            Color red = new Color32(0xC8, 0x10, 0x2E, 0xFF);
 
-            // Cuerda: una línea de tinta
-            _rope = new GameObject("Rope").AddComponent<LineRenderer>();
-            _rope.transform.SetParent(transform.parent, false);
-            _rope.positionCount = 2;
-            _rope.widthMultiplier = 0.045f;
-            _rope.startColor = _rope.endColor = _cfg.ink;
-            _rope.sortingOrder = 2;
-            InkArt.Apply(_rope);
+            // Cuerda fina blanca
+            _rope = Art.Line("Rope", transform.parent, 2, 0.05f, new Color(1f, 1f, 1f, 0.7f), 2);
+            _rope.useWorldSpace = true;
 
             _body = new GameObject("Body").transform;
             _body.SetParent(transform, false);
 
-            // Objetivo: diana de Kenney (Shooting Gallery «target_red1»); conserva el rojo de los anillos.
-            // La diana ocupa todo el sprite: su radio exterior coincide con lanternRadius.
-            KenneyArt.Shape("target_red1", _body, Vector2.zero, r * 2f, _cfg.ink, 5, keepColor: true);
+            // Diana hipercasual (ShapeForge «target»): el anillo exterior ocupa 120 de los 128 px de radio del sprite
+            Art.Shape("target", _body, Vector2.zero, r * 2f * 128f / 120f, Color.white, 5);
         }
 
         // El acierto hace que el farolillo se balancee y dé un pequeño bote

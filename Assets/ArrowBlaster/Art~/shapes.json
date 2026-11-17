@@ -1,0 +1,51 @@
+{
+  "palette": "hyper",
+  "colors": {"body": "#E2E2E2", "core": "#BDBDBD", "gold": "#FFC531"},
+  "assets": [
+    { "name": "pointer_outline", "width": 256, "height": 256, "layers": [
+      {"type": "polygon", "cx": 128, "cy": 128, "r": 116, "sides": 3, "rotation": 90, "radius": 22, "fill": "$white"} ] },
+    { "name": "pointer_fill", "width": 256, "height": 256, "layers": [
+      {"type": "polygon", "cx": 128, "cy": 128, "r": 84, "sides": 3, "rotation": 90, "radius": 12, "fill": "$white"} ] },
+    { "name": "circle", "width": 256, "height": 256, "layers": [
+      {"type": "circle", "cx": 128, "cy": 128, "r": 124, "fill": "$white"} ] },
+    { "name": "ring", "width": 256, "height": 256, "layers": [
+      {"type": "ring", "cx": 128, "cy": 128, "r": 124, "inner": 90, "fill": "$white"} ] },
+    { "name": "pill", "width": 128, "height": 128, "layers": [
+      {"type": "rect", "x": 2, "y": 2, "w": 124, "h": 124, "radius": 60, "fill": "$white"} ] },
+    { "name": "slab", "width": 128, "height": 128, "layers": [
+      {"type": "rect", "x": 0, "y": 0, "w": 128, "h": 128, "radius": 30, "fill": "$white"} ] },
+    { "name": "body", "width": 256, "height": 256, "layers": [
+      {"type": "blob", "cx": 128, "cy": 124, "r": 104, "lobes": 9, "jitter": 0.05, "seed": 4, "fill": "$body", "highlight": {"height": 0.42, "opacity": 0.75}, "shadow": {"dy": 10, "opacity": 0.22}} ] },
+    { "name": "face", "width": 256, "height": 256, "layers": [
+      {"type": "circle", "cx": 98, "cy": 112, "r": 24, "fill": "$white"},
+      {"type": "circle", "cx": 158, "cy": 112, "r": 24, "fill": "$white"},
+      {"type": "circle", "cx": 92, "cy": 116, "r": 12, "fill": "$ink"},
+      {"type": "circle", "cx": 152, "cy": 116, "r": 12, "fill": "$ink"},
+      {"type": "line", "points": [[108, 162], [128, 174], [148, 162]], "stroke": {"color": "$ink", "width": 9}} ] },
+    { "name": "face_angry", "width": 256, "height": 256, "layers": [
+      {"type": "circle", "cx": 96, "cy": 120, "r": 24, "fill": "$white"},
+      {"type": "circle", "cx": 160, "cy": 120, "r": 24, "fill": "$white"},
+      {"type": "circle", "cx": 90, "cy": 126, "r": 12, "fill": "$ink"},
+      {"type": "circle", "cx": 154, "cy": 126, "r": 12, "fill": "$ink"},
+      {"type": "capsule", "x1": 66, "y1": 80, "x2": 116, "y2": 98, "r": 8, "fill": "$ink"},
+      {"type": "capsule", "x1": 140, "y1": 98, "x2": 190, "y2": 80, "r": 8, "fill": "$ink"},
+      {"type": "line", "points": [[104, 182], [128, 170], [152, 182]], "stroke": {"color": "$ink", "width": 9}} ] },
+    { "name": "spike", "width": 256, "height": 256, "layers": [
+      {"type": "star", "cx": 128, "cy": 128, "r": 120, "inner": 0.66, "points": 10, "radius": 6, "fill": "$white"},
+      {"type": "circle", "cx": 128, "cy": 128, "r": 56, "fill": "$core"} ] },
+    { "name": "spark", "width": 128, "height": 128, "layers": [
+      {"type": "star", "cx": 64, "cy": 64, "r": 62, "inner": 0.3, "points": 4, "radius": 3, "fill": "$white"} ] },
+    { "name": "heart", "width": 256, "height": 256, "layers": [
+      {"type": "heart", "cx": 128, "cy": 132, "size": 236, "fill": "$white"} ] },
+    { "name": "hill", "width": 256, "height": 256, "layers": [
+      {"type": "points", "points": [[128, 16], [250, 256], [6, 256]], "radius": 40, "fill": "$white"} ] },
+    { "name": "target", "width": 256, "height": 256, "layers": [
+      {"type": "circle", "cx": 128, "cy": 134, "r": 120, "fill": "$shadow", "opacity": 0.18},
+      {"type": "circle", "cx": 128, "cy": 124, "r": 120, "fill": "$white"},
+      {"type": "circle", "cx": 128, "cy": 124, "r": 94, "fill": "$red"},
+      {"type": "circle", "cx": 128, "cy": 124, "r": 66, "fill": "$white"},
+      {"type": "circle", "cx": 128, "cy": 124, "r": 38, "fill": "$red", "highlight": true} ] },
+    { "name": "star", "width": 256, "height": 256, "layers": [
+      {"type": "star", "cx": 128, "cy": 134, "r": 116, "inner": 0.48, "radius": 12, "fill": "$yellow", "highlight": true, "shadow": {"dy": 8, "opacity": 0.2}} ] }
+  ]
+}

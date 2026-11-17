@@ -8,7 +8,7 @@ namespace ArrowBlaster
     //  - Chocar sin atacar: quita una vida (pilares, enemigos, proyectiles).
     //  - Chocar atacando: rompe lo que toca y cuesta fuerza.
     //  - Los toques dorados no hacen daño: dan monedas al tocarlos.
-    // Estilo: tinta negra sobre papel; lo peligroso, en color.
+    // Estilo hipercasual: figuras geométricas con los colores de la paleta de la zona.
     public abstract class Obstacle : MonoBehaviour
     {
         protected ArrowGame Game;
@@ -39,7 +39,7 @@ namespace ArrowBlaster
 
     }
 
-    // Dos trazos verticales de color con un hueco: hay que pasar por el hueco o romperlos atacando.
+    // Dos losas de color con un hueco: hay que pasar por el hueco o romperlos atacando.
     public sealed class WallGap : Obstacle
     {
         public float GapCenter;
@@ -62,15 +62,9 @@ namespace ArrowBlaster
             root.SetParent(transform, false);
             root.position = r.center;
 
-            // Columna de Kenney (Scribble Platformer Expansion) repetida en vertical, en tinta,
-            // con una pincelada roja en el extremo que da al hueco (lo peligroso, en color)
-            var col = KenneyArt.Shape("column_middle", root, Vector2.zero, 1f, Cfg.ink, 6);
-            col.drawMode = SpriteDrawMode.Tiled;
-            col.transform.localScale = Vector3.one;
-            col.size = new Vector2(r.width * 128f / 88f, r.height);
-            float h = r.height * 0.5f;
-            float capY = capAtBottom ? -h + 0.12f : h - 0.12f;
-            Brush.Line("Cap", root, new Vector2(-r.width * 0.75f, capY), new Vector2(r.width * 0.75f, capY), 0.3f, Cfg.danger, 8, bend: 0.08f, dry: 0.8f);
+            // Losa de color con relieve: la cara lateral (más oscura) asoma por la izquierda y por abajo
+            Art.Box("Side", root, new Vector2(-0.18f, -0.12f), new Vector2(r.width, r.height), Art.P.wallSide, 5);
+            Art.Box("Face", root, Vector2.zero, new Vector2(r.width, r.height), Art.P.wall, 6);
             _parts.Add((root, r));
         }
 
@@ -88,7 +82,7 @@ namespace ArrowBlaster
         }
     }
 
-    // Mancha de color con ojos y cuernos de tinta (un pequeño oni) que dispara bolas hacia la flecha.
+    // Bola de color con cara que dispara bolas hacia el puntero.
     public sealed class Enemy : Obstacle
     {
         private const float Radius = 0.6f;
@@ -101,9 +95,9 @@ namespace ArrowBlaster
             _phase = Random.value * 10f;
             _body = new GameObject("Enemy").transform;
             _body.SetParent(transform, false);
-            // Personaje redondo de Kenney (Scribble Platformer); conserva su color
-            string[] looks = { "character_roundRed", "character_roundGreen", "character_roundPurple", "character_roundYellow" };
-            KenneyArt.Shape(looks[Random.Range(0, looks.Length)], _body, Vector2.zero, Radius * 3.1f, Cfg.ink, 5, keepColor: true);
+            // Bola de color con cara (ShapeForge «body» + «face»)
+            Art.Shape("body", _body, Vector2.zero, Radius * 2.5f, Art.P.enemy, 5);
+            Art.Shape("face", _body, Vector2.zero, Radius * 2.5f, Color.white, 6);
 
             _fireTimer = Cfg.enemyFireInterval * 0.5f;
         }
@@ -142,8 +136,8 @@ namespace ArrowBlaster
 
         protected override void Build()
         {
-            var shot = KenneyArt.Shape("effect_shot", transform, Vector2.zero, Radius * 5f, Cfg.ink, 7, keepColor: true);
-            shot.flipX = true; // la estela del disparo queda detrás (va hacia la izquierda)
+            Art.Shape("ring", transform, Vector2.zero, Radius * 2.6f, Color.white, 7);
+            Art.Shape("circle", transform, Vector2.zero, Radius * 2f, Art.P.enemy, 8);
         }
 
         public override void Tick(float dt)
@@ -180,7 +174,8 @@ namespace ArrowBlaster
                 var t = new GameObject("Target").transform;
                 t.SetParent(transform, false);
                 t.localPosition = new Vector2(i * 1.1f, dy);
-                KenneyArt.Shape("tile_coin", t, Vector2.zero, Radius * 4f, Cfg.ink, 6, keepColor: true);
+                Art.Shape("circle", t, Vector2.zero, Radius * 2f, Art.P.coinRing, 6);
+                Art.Shape("circle", t, Vector2.zero, Radius * 1.4f, Art.P.coin, 7);
                 _targets.Add(t);
             }
         }
@@ -208,7 +203,7 @@ namespace ArrowBlaster
 
 namespace ArrowBlaster
 {
-    // Partículas de impulso: las buenas (estrellas doradas) dan fuerza y un acelerón; las malas (humo de tinta) frenan.
+    // Partículas de impulso: las buenas (estrellas) dan fuerza; las malas (pinchos oscuros) la quitan.
     // Se recogen al tocarlas, ataques aparte. Van en grupos en línea o en arco para que merezca la pena ir a por ellas.
     public sealed class PickupCluster : Obstacle
     {
@@ -230,8 +225,8 @@ namespace ArrowBlaster
                 var t = new GameObject(good ? "Good" : "Bad").transform;
                 t.SetParent(transform, false);
                 t.localPosition = new Vector2(i * 1.05f, dy);
-                if (good) KenneyArt.Shape("star", t, Vector2.zero, Radius * 2.6f, Cfg.ink, 6, keepColor: true);
-                else KenneyArt.Shape("smoke", t, Vector2.zero, Radius * 2.6f, Cfg.ink, 6);
+                if (good) Art.Shape("star", t, Vector2.zero, Radius * 2.6f, Color.white, 6);
+                else Art.Shape("spike", t, Vector2.zero, Radius * 2.4f, new Color32(0x2B, 0x2D, 0x42, 0xFF), 6);
                 _items.Add((t, good));
             }
         }
