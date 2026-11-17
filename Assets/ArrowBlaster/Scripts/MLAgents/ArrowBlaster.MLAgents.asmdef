@@ -5,7 +5,9 @@
         "ArrowBlaster",
         "Unity.ML-Agents"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
