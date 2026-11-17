@@ -62,6 +62,13 @@ namespace ArrowBlaster
 
         private Image _attackZone;
 
+        // Dedo del tutorial: punto blanco con un aro que se expande al «tocar»
+        private RectTransform _touch;
+        private Image _touchDot, _touchRing;
+        private bool _touchOn;
+        private Vector2 _touchVp, _touchDrag;
+        public bool PulseAttackZone;
+
         private void Build()
         {
             // Franja de ataque: rojo que se desvanece de izquierda (opaco) a derecha (transparente). Va por debajo del resto.
@@ -112,6 +119,22 @@ namespace ArrowBlaster
             _toast = Label("Toast", _root, new Vector2(0.5f, 0.5f), new Vector2(0, 200), new Vector2(1000, 150), "", 50, 110, TextAnchor.MiddleCenter, _cfg.uiInk);
             _small = Label("SmallToast", _root, new Vector2(0.5f, 0.5f), new Vector2(0, 90), new Vector2(400, 70), "", 30, 52, TextAnchor.MiddleCenter, _cfg.reward);
 
+            // Dedo del tutorial
+            _touch = new GameObject("Touch", typeof(RectTransform)).GetComponent<RectTransform>();
+            _touch.SetParent(_root, false);
+            Anchor(_touch, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(90, 90));
+            _touch.pivot = new Vector2(0.5f, 0.5f);
+            _touchRing = Box("Ring", _touch, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(90, 90), Color.white).GetComponent<Image>();
+            _touchRing.sprite = Art.Ring;
+            _touchRing.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            _touchDot = Box("Dot", _touch, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(80, 80), Color.white).GetComponent<Image>();
+            _touchDot.sprite = Art.Circle;
+            _touchDot.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            var dotShadow = _touchDot.gameObject.AddComponent<Shadow>();
+            dotShadow.effectColor = new Color(0f, 0f, 0f, 0.25f);
+            dotShadow.effectDistance = new Vector2(0f, -5f);
+            _touch.gameObject.SetActive(false);
+
             // Destello al recibir daño
             _flash = Box("Flash", _root, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, Color.clear).GetComponent<Image>();
             Stretch(_flash.rectTransform);
@@ -150,6 +173,50 @@ namespace ArrowBlaster
 
         public void SetHint(string text) => _hint.text = text;
 
+        // viewport: posición en pantalla (0–1). drag: recorrido del dedo en píxeles de referencia (cero = toque)
+        public void SetTouch(bool on, Vector2 viewport, Vector2 drag)
+        {
+            _touchOn = on;
+            _touchVp = viewport;
+            _touchDrag = drag;
+        }
+
+        private void AnimateTouch()
+        {
+            if (_attackZone.enabled)
+            {
+                float a = PulseAttackZone ? 0.3f + 0.25f * (0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 8f)) : 0.22f;
+                _attackZone.color = new Color(_cfg.attack.r, _cfg.attack.g, _cfg.attack.b, a);
+            }
+            if (_touch.gameObject.activeSelf != _touchOn) _touch.gameObject.SetActive(_touchOn);
+            if (!_touchOn) return;
+            _touch.anchorMin = _touch.anchorMax = _touchVp;
+
+            if (_touchDrag != Vector2.zero)
+            {
+                // Arrastre: pulsa, tira hacia atrás, se queda un momento y suelta
+                float t = Mathf.Repeat(Time.unscaledTime, 1.6f) / 1.6f;
+                float k = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.15f, 0.7f, t));
+                _touch.anchoredPosition = _touchDrag * k;
+                float alpha = t < 0.85f ? 1f : 1f - (t - 0.85f) / 0.15f;
+                _touchDot.color = new Color(1f, 1f, 1f, 0.95f * alpha);
+                float press = Mathf.Clamp01(t / 0.15f);
+                _touchRing.color = new Color(1f, 1f, 1f, (1f - press) * alpha);
+                _touchRing.rectTransform.localScale = Vector3.one * Mathf.Lerp(0.9f, 1.8f, press);
+                _touchDot.rectTransform.localScale = Vector3.one * (t < 0.15f ? Mathf.Lerp(1.2f, 0.9f, press) : 0.9f);
+            }
+            else
+            {
+                // Toque: el punto se hunde y el aro se expande
+                float t = Mathf.Repeat(Time.unscaledTime, 0.9f) / 0.9f;
+                _touch.anchoredPosition = Vector2.zero;
+                _touchDot.color = new Color(1f, 1f, 1f, 0.95f);
+                _touchDot.rectTransform.localScale = Vector3.one * (t < 0.15f ? Mathf.Lerp(1.15f, 0.85f, t / 0.15f) : Mathf.Lerp(0.85f, 1.15f, (t - 0.15f) / 0.85f));
+                _touchRing.color = new Color(1f, 1f, 1f, 1f - t);
+                _touchRing.rectTransform.localScale = Vector3.one * Mathf.Lerp(0.9f, 2.2f, t);
+            }
+        }
+
         public void SetAttackZone(bool visible, float width)
         {
             _attackZone.enabled = visible;
@@ -182,6 +249,7 @@ namespace ArrowBlaster
             _forceBar.anchoredPosition = new Vector2(60, -70) + Random.insideUnitCircle * 5f * _drainFx;
             if (draining && Random.value < 0.5f) _game.StartCoroutine(Drip(t));
             _distance.text = $"{Mathf.Max(0f, distance):0} m";
+            AnimateTouch();
             _coins.text = coins.ToString();
         }
 

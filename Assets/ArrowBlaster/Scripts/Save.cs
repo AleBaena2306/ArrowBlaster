@@ -18,11 +18,15 @@ namespace ArrowBlaster
         public static float BossHp(int zone) => PlayerPrefs.GetFloat("ab_boss" + zone, -1f);
         public static void SetBossHp(int zone, float hp) { PlayerPrefs.SetFloat("ab_boss" + zone, hp); PlayerPrefs.Save(); }
 
+        // Tutorial de la primera run (apuntar, impulso y golpe)
+        public static bool TutorialDone { get => PlayerPrefs.GetInt("ab_tut", 0) == 1; set { PlayerPrefs.SetInt("ab_tut", value ? 1 : 0); PlayerPrefs.Save(); } }
+
         public static void ResetProgress()
         {
             PlayerPrefs.DeleteKey("ab_zone");
             PlayerPrefs.DeleteKey("ab_loop");
             for (int i = 0; i < 8; i++) PlayerPrefs.DeleteKey("ab_boss" + i);
+            PlayerPrefs.DeleteKey("ab_tut");
         }
 
         public static bool Spend(int coins)

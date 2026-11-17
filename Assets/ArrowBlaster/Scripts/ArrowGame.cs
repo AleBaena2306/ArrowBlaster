@@ -31,6 +31,11 @@ namespace ArrowBlaster
         private float _dropTimer;
         private Scenery _scenery;
 
+        // Tutorial de la primera run: -1 = no hay; 0 apuntar; 1 impulso; 2 esperar obstáculo; 3 golpe
+        private int _tutStep = -1;
+        private bool _slowMo;
+        private float BaseTimeScale => _slowMo ? 0.25f : 1f;
+
         // Zonas y jefes
         private int _zone;
         private Boss _boss;
@@ -106,6 +111,8 @@ namespace ArrowBlaster
             _bossDone = false;
             _attackTimer = _attackCooldown = 0f;
             _state = State.Aim;
+            _tutStep = Save.TutorialDone ? -1 : 0;
+            _slowMo = false;
             _hud.ShowRun(_lives);
             _hud.SetHint("Drag back to aim · Release to shoot");
             SetPaused(false);
@@ -128,6 +135,7 @@ namespace ArrowBlaster
                 case State.Over: break;
             }
 
+            UpdateTutorial();
             UpdateArrowVisual();
             UpdateCamera(dt);
             if (_boss != null) _hud.SetProgress(_boss.Hp / _boss.MaxHp, true, "BOSS");
@@ -325,7 +333,7 @@ namespace ArrowBlaster
         private IEnumerator HideHintLater(float t)
         {
             yield return new WaitForSeconds(t);
-            if (_state == State.Flight) _hud.SetHint("");
+            if (_state == State.Flight && _tutStep < 0) _hud.SetHint("");
         }
 
         private float _startForce = 1f;
@@ -529,7 +537,7 @@ namespace ArrowBlaster
             if (_paused) yield break;
             Time.timeScale = 0.05f;
             yield return new WaitForSecondsRealtime(seconds);
-            if (!_paused) Time.timeScale = 1f;
+            if (!_paused) Time.timeScale = BaseTimeScale;
         }
 
         // ───────────────────────── Obstáculos ─────────────────────────
@@ -562,6 +570,7 @@ namespace ArrowBlaster
         {
             float total = Config.wallWeight + Config.enemyWeight + Config.targetsWeight + Config.pickupsWeight;
             float r = Random.value * total;
+            if (_tutStep >= 0) r = 0f; // durante el tutorial, solo paredes (para enseñar el golpe)
             float margin = Config.gapHeight * 0.5f + 0.4f;
             if (r < Config.wallWeight)
             {
@@ -744,12 +753,72 @@ namespace ArrowBlaster
             if (sr != null) Destroy(sr.gameObject);
         }
 
+        // ───────────────────────── Tutorial ─────────────────────────
+        // Solo la primera vez: un dedo animado enseña a apuntar; después, a cámara lenta, el impulso
+        // (tocar a la derecha) y el golpe (tocar la franja roja) justo antes de la primera pared.
+
+        private void UpdateTutorial()
+        {
+            switch (_tutStep)
+            {
+                case 0:
+                    if (_state == State.Aim)
+                    {
+                        Vector2 vp = _cam.WorldToViewportPoint(Config.bowPosition);
+                        _hud.SetTouch(!_dragging, vp, new Vector2(-260f, -150f));
+                    }
+                    else if (_state == State.Flight) { _tutStep = 1; SetSlowMo(true); _hud.SetHint("TAP on the right to fly up"); }
+                    else _hud.SetTouch(false, default, default);
+                    break;
+                case 1:
+                    _hud.SetTouch(true, new Vector2(0.65f, 0.42f), Vector2.zero);
+                    if (_flapPressed || _state != State.Flight) { _tutStep = 2; SetSlowMo(false); _hud.SetHint(""); }
+                    break;
+                case 2:
+                    _hud.SetTouch(false, default, default);
+                    if (_state == State.Flight && ObstacleAhead(6.5f)) { _tutStep = 3; SetSlowMo(true); _hud.SetHint("TAP the red edge to SMASH"); }
+                    break;
+                case 3:
+                    _hud.SetTouch(true, new Vector2(Config.attackZone * 0.5f, 0.42f), Vector2.zero);
+                    _hud.PulseAttackZone = true;
+                    if (_attackPressed || _state != State.Flight)
+                    {
+                        if (_attackPressed) Save.TutorialDone = true;
+                        _tutStep = -1;
+                        SetSlowMo(false);
+                        _hud.SetHint("");
+                        _hud.PulseAttackZone = false;
+                    }
+                    break;
+                default:
+                    _hud.SetTouch(false, default, default);
+                    break;
+            }
+        }
+
+        private void SetSlowMo(bool on)
+        {
+            _slowMo = on;
+            if (!_paused) Time.timeScale = BaseTimeScale;
+        }
+
+        private bool ObstacleAhead(float distance)
+        {
+            foreach (var o in _obstacles)
+            {
+                if (o == null || o is Projectile || o is Boss) continue;
+                float dx = o.transform.position.x - _pos.x;
+                if (dx > 0.5f && dx < distance) return true;
+            }
+            return false;
+        }
+
         // ───────────────────────── Pausa ─────────────────────────
 
         public void SetPaused(bool paused)
         {
             _paused = paused;
-            Time.timeScale = paused ? 0f : 1f;
+            Time.timeScale = paused ? 0f : BaseTimeScale;
             _hud.SetPaused(paused);
         }
 
