@@ -223,6 +223,10 @@ namespace ArrowBlaster
             // Punto y coma: Excel en español usa la coma para los decimales
             _csv.AppendLine($"{_player + 1};{SkillOf(_player):0.00};{_runs};{Minutes:0.0};{_game.Zone + 1};{_game.Distance:0};{_game.LastRunCoins};{dead};{ups.ToString().Trim()}");
 
+            // Se guarda tras cada run para poder mirar los datos sin esperar al final
+            File.WriteAllText(Path.Combine(_dir, "runs.csv"), _csv.ToString());
+            File.WriteAllText(Path.Combine(_dir, "resumen.txt"), _summary.ToString());
+
             bool beaten = Save.Loop > 0;
             bool timeout = Minutes > maxHoursPerPlayer * 60f;
             if (beaten || timeout)
