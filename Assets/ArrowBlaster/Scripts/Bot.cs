@@ -131,9 +131,9 @@ namespace ArrowBlaster
     public sealed class BotPlayer : MonoBehaviour
     {
         public static bool Requested;           // lo activa el menú POINTY DASH > Bots
-        public int players = 6;
-        public float minSkill = 0.35f, maxSkill = 0.8f;
-        public float maxHoursPerPlayer = 3f;    // tope por si un bot se atasca
+        public int players = 4;
+        public float minSkill = 0.4f, maxSkill = 0.8f;
+        public float maxHoursPerPlayer = 2.5f;    // tope por si un bot se atasca
         public float overheadPerRun = 10f;      // segundos reales por run que no son vuelo (apuntar, tienda)
 
         private ArrowGame _game;

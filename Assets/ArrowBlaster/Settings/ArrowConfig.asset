@@ -49,8 +49,8 @@ MonoBehaviour:
   projectileSpeed: 5
   enemyFireInterval: 1.6
   enemyRange: 18
-  coinsPerMeter: 0.2
-  coinsPerTarget: 8
+  coinsPerMeter: 0.4
+  coinsPerTarget: 12
   coinsPerEnemy: 10
   coinsPerWall: 3
   paper: {r: 0.98039216, g: 0.972549, b: 0.9529412, a: 1}

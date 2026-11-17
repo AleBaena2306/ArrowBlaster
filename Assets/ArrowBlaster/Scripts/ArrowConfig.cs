@@ -95,9 +95,9 @@ namespace ArrowBlaster
 
         [Header("Dificultad por zona (todas las zonas van en la misma run)")]
         [Tooltip("Multiplica todo lo que quita fuerza de golpe en cada zona: choques, pinchos, ataques y roturas. En la zona 2 un choque debe dejarte casi sin fuerza.")]
-        public float[] zoneLossMultiplier = { 1f, 3f, 5f, 8f };
+        public float[] zoneLossMultiplier = { 1f, 2.5f, 4f, 6f };
         [Tooltip("Multiplica el desgaste continuo de fuerza en cada zona.")]
-        public float[] zoneDecayMultiplier = { 1f, 1.6f, 2.2f, 2.8f };
+        public float[] zoneDecayMultiplier = { 1f, 1.3f, 1.6f, 1.9f };
         [Tooltip("Ritmo de subida que se le exige al jugador entre paredes (unidades por segundo). Más bajo = huecos más fáciles de alcanzar.")]
         public float gapClimbRate = 3.2f;
         [Tooltip("Ritmo de bajada exigible entre paredes (unidades por segundo).")]
@@ -134,11 +134,11 @@ namespace ArrowBlaster
 
         [Header("Zonas y jefes")]
         [Tooltip("Distancia hasta el jefe de cada zona (metros).")]
-        public float[] zoneLengths = { 300f, 450f, 600f, 800f };
+        public float[] zoneLengths = { 300f, 400f, 500f, 600f };
         [Tooltip("Vida de cada jefe (se conserva entre runs).")]
         public float[] bossHp = { 400f, 900f, 1600f, 2500f };
         [Tooltip("Monedas por derrotar a cada jefe.")]
-        public int[] bossReward = { 100, 200, 350, 600 };
+        public int[] bossReward = { 150, 300, 500, 800 };
         [Tooltip("Daño por golpe atacando (lo aumenta la mejora Destrucción).")]
         public float bossDamage = 30f;
         public float bossRadius = 1.5f;
@@ -149,8 +149,8 @@ namespace ArrowBlaster
         public float bossChargeSpeed = 22f;
 
         [Header("Monedas")]
-        public float coinsPerMeter = 0.2f;
-        public int coinsPerTarget = 8;
+        public float coinsPerMeter = 0.4f;
+        public int coinsPerTarget = 12;
         public int coinsPerEnemy = 10;
         public int coinsPerWall = 3;
 

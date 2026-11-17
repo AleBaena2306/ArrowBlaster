@@ -92,7 +92,7 @@ namespace ArrowBlaster.Editor
 
         // Bots programados juegan el juego entero varias veces desde cero, a toda velocidad,
         // y apuntan cuánto tardan en cada jefe (BotRuns/resumen.txt y BotRuns/runs.csv).
-        [MenuItem("POINTY DASH/Bots/Simular progresión (6 bots)", priority = 40)]
+        [MenuItem("POINTY DASH/Bots/Simular progresión (4 bots)", priority = 40)]
         private static void SimulateProgression()
         {
             if (!EditorUtility.DisplayDialog("Pointy Dash · Bots",
