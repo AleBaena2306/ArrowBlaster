@@ -15,7 +15,7 @@ namespace ArrowBlaster.Editor
         private const string ScenePath = Root + "/Scenes/Game.unity";
         private const string ConfigPath = Root + "/Settings/ArrowConfig.asset";
 
-        [MenuItem("ARROW BLASTER/Setup (escena y ajustes)", priority = 0)]
+        [MenuItem("POINTY DASH/Setup (escena y ajustes)", priority = 0)]
         public static void Setup()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
@@ -53,7 +53,7 @@ namespace ArrowBlaster.Editor
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
 
             PlayerSettings.companyName = "Kovu's Pride";
-            PlayerSettings.productName = "Arrow Blaster";
+            PlayerSettings.productName = "Pointy Dash";
             PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android, "com.KovusPride.ArrowBlaster");
             PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.WebGL, "com.KovusPride.ArrowBlaster");
             PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Standalone, "com.KovusPride.ArrowBlaster");
@@ -70,7 +70,7 @@ namespace ArrowBlaster.Editor
             Debug.Log($"[ArrowBlaster] Escena lista en {ScenePath}. Pulse Play para jugar. Los números del juego están en {ConfigPath}.");
         }
 
-        [MenuItem("ARROW BLASTER/Abrir configuración", priority = 1)]
+        [MenuItem("POINTY DASH/Abrir configuración", priority = 1)]
         private static void OpenConfig()
         {
             var config = AssetDatabase.LoadAssetAtPath<ArrowConfig>(ConfigPath);
@@ -79,7 +79,7 @@ namespace ArrowBlaster.Editor
             EditorGUIUtility.PingObject(config);
         }
 
-        [MenuItem("ARROW BLASTER/Borrar partida guardada", priority = 2)]
+        [MenuItem("POINTY DASH/Borrar partida guardada", priority = 2)]
         private static void ClearSave()
         {
             if (!EditorUtility.DisplayDialog("Arrow Blaster", "¿Borrar las monedas, el récord y las mejoras guardados en este ordenador?", "Borrar", "Cancelar")) return;

@@ -4,7 +4,7 @@ namespace ArrowBlaster
 {
     // Todos los números del juego en un solo asset (Assets/ArrowBlaster/Settings/ArrowConfig.asset).
     // Se pueden tocar con el juego en marcha: los cambios se notan en la siguiente run.
-    [CreateAssetMenu(fileName = "ArrowConfig", menuName = "Arrow Blaster/Config")]
+    [CreateAssetMenu(fileName = "ArrowConfig", menuName = "Pointy Dash/Config")]
     public sealed class ArrowConfig : ScriptableObject
     {
         [Header("Mundo")]

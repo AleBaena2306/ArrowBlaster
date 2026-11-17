@@ -7,18 +7,18 @@ namespace ArrowBlaster.Editor
     // Solo se compila si el paquete com.kovuspride.framework está instalado (define KP_FRAMEWORK).
     public static class ArrowBlasterWebBuild
     {
-        private static readonly WebGame Game = new WebGame("arrow-blaster", "Arrow Blaster");
+        private static readonly WebGame Game = new WebGame("pointy-dash", "Pointy Dash");
 
-        [MenuItem("ARROW BLASTER/Build/Web (móvil + PC)", priority = 20)]
+        [MenuItem("POINTY DASH/Build/Web (móvil + PC)", priority = 20)]
         private static void Web() => KovusPrideWebBuild.BuildAndPublish(Game);
 
-        [MenuItem("ARROW BLASTER/Build/Web: solo compilar (sin publicar)", priority = 21)]
+        [MenuItem("POINTY DASH/Build/Web: solo compilar (sin publicar)", priority = 21)]
         private static void Only() => KovusPrideWebBuild.BuildOnly(Game);
 
-        [MenuItem("ARROW BLASTER/Build/Web: prueba rápida (solo PC, sin publicar)", priority = 22)]
+        [MenuItem("POINTY DASH/Build/Web: prueba rápida (solo PC, sin publicar)", priority = 22)]
         private static void Quick() => KovusPrideWebBuild.QuickTest(Game);
 
-        [MenuItem("ARROW BLASTER/Build/Web: publicar la última build", priority = 23)]
+        [MenuItem("POINTY DASH/Build/Web: publicar la última build", priority = 23)]
         private static void Publish() => KovusPrideWebBuild.PublishOnly(Game);
     }
 }
