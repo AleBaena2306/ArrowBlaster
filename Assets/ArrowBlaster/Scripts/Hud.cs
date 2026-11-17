@@ -325,7 +325,9 @@ namespace ArrowBlaster
 
         private void Buy(Stat stat)
         {
-            if (Upgrades.TryBuy(stat)) Toast(Upgrades.Get(stat).Name + " +1", Upgrades.Get(stat).Color, small: true);
+            bool bought = Upgrades.TryBuy(stat);
+            Sfx.Play(bought ? "buy" : "error", 0.7f);
+            if (bought) Toast(Upgrades.Get(stat).Name + " +1", Upgrades.Get(stat).Color, small: true);
             RefreshShop();
         }
 
@@ -488,6 +490,7 @@ namespace ArrowBlaster
             colors.highlightedColor = new Color(0.8f, 0.8f, 0.8f);
             colors.pressedColor = new Color(0.6f, 0.6f, 0.6f);
             b.colors = colors;
+            b.onClick.AddListener(() => Sfx.Play("click", 0.6f));
             b.onClick.AddListener(onClick);
             Label("Text", rt, new Vector2(0.5f, 0.5f), round ? Vector2.zero : new Vector2(-size.x * 0.04f, 0f), size * (round ? 0.5f : 0.72f), text, 20, 60,
                 TextAnchor.MiddleCenter, round ? _cfg.uiInk : _cfg.uiPanel);

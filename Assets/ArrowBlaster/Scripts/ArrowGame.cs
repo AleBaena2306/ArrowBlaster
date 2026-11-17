@@ -71,6 +71,7 @@ namespace ArrowBlaster
             Application.targetFrameRate = 60;
             SetupCamera();
             EnsureEventSystem();
+            Sfx.Init();
             Art.P = Config.Palette(Mathf.Clamp(Save.Zone, 0, Config.zoneLengths.Length - 1));
             _scenery = Scenery.Create(_cam, Config);
             _hud = new Hud(this, Config);
@@ -271,6 +272,7 @@ namespace ArrowBlaster
 
         private void Shoot()
         {
+            Sfx.Play("launch", 0.8f);
             _launchDraw = _draw;
             _vel = AimDirection * LaunchSpeed(_draw);
             _bow.Release();
@@ -314,6 +316,7 @@ namespace ArrowBlaster
             _force = Mathf.Min(Config.initialForce * Upgrades.PowerMultiplier * multiplier * Mathf.Lerp(0.7f, 1f, _launchDraw), Config.maxForce);
             _startForce = Mathf.Max(1f, _force);
             bool perfect = label == "PERFECT";
+            Sfx.Play(perfect ? "perfect" : "target", 0.8f);
             _hud.Toast($"{label}  ×{multiplier:0.0}", perfect ? Config.reward : Config.uiInk);
             if (hitLantern)
             {
@@ -346,7 +349,7 @@ namespace ArrowBlaster
         {
             // Entrada: tocar = impulso; mantener = atacar (planeo)
             // Impulso al tocar la derecha; golpe de duración fija al tocar la franja roja de la izquierda
-            if (_flapPressed) _vel.y = Config.flapVelocity;
+            if (_flapPressed) { _vel.y = Config.flapVelocity; Sfx.Play("flap", 0.6f, Random.Range(0.95f, 1.15f)); }
             if (_attackCooldown > 0f) _attackCooldown -= dt;
             if (_attackTimer > 0f)
             {
@@ -356,6 +359,7 @@ namespace ArrowBlaster
             else if (_attackPressed && _attackCooldown <= 0f)
             {
                 _attackTimer = Config.attackDuration;
+                Sfx.Play("attack", 0.6f);
                 _force = Mathf.Max(0f, _force - Config.attackForceCost * Upgrades.AttackCostMultiplier);
                 _shake = Mathf.Max(_shake, 0.08f);
             }
@@ -429,6 +433,7 @@ namespace ArrowBlaster
 
         private void EndRun()
         {
+            Sfx.Play("over", 0.7f);
             _state = State.Over;
             int distanceCoins = Mathf.FloorToInt(_pos.x * Config.coinsPerMeter);
             int earned = _runCoins + distanceCoins;
@@ -445,6 +450,7 @@ namespace ArrowBlaster
             if (_invulnerable > 0f || _state != State.Flight) return;
             // Una sola barra: cada golpe quita fuerza (velocidad y vida a la vez)
             _force = Mathf.Max(0f, _force - Config.hitForceCost * Upgrades.HitCostMultiplier);
+            Sfx.Play("hurt", 0.9f);
             _invulnerable = Config.invulnerableTime;
             _shake = 0.35f;
             Splash(at, Config.danger, 8, 1f);
@@ -454,6 +460,7 @@ namespace ArrowBlaster
 
         public void Break(Vector2 at, float forceCost, int coins, Color color)
         {
+            Sfx.Play("break", 0.8f, 1f, 3);
             _force = Mathf.Max(0f, _force - forceCost * Upgrades.AttackCostMultiplier);
             _runCoins += coins;
             _shake = Mathf.Max(_shake, 0.15f);
@@ -490,12 +497,14 @@ namespace ArrowBlaster
             boss.Knockback(3f);
             Break(at, Config.breakForceCost, 0, Config.attack);
             _invulnerable = 0.15f;
+            Sfx.Play("boss_hit", 0.7f);
             if (boss.Hp > 0f) { Save.SetBossHp(_zone, boss.Hp); return false; }
 
             // Jefe derrotado: recompensa, siguiente zona (o vuelta de New Game+ con jefes más duros)
             int reward = Config.bossReward[Mathf.Clamp(_zone, 0, Config.bossReward.Length - 1)] * (1 + Save.Loop);
             _runCoins += reward;
             Save.SetBossHp(_zone, -1f);
+            Sfx.Play("boss_defeat", 0.9f);
             int next = _zone + 1;
             if (next >= Config.zoneLengths.Length) { next = 0; Save.Loop = Save.Loop + 1; }
             Save.Zone = next;
@@ -512,6 +521,7 @@ namespace ArrowBlaster
 
         public void Pickup(Vector2 at, bool good)
         {
+            Sfx.Play(good ? "star" : "spike", 0.7f);
             if (good)
             {
                 _force = Mathf.Min(Config.maxForce, _force + Config.pickupForce);
@@ -528,6 +538,7 @@ namespace ArrowBlaster
         // Toque dorado recogido: monedas sin coste de fuerza ni parón
         public void Collect(Vector2 at, int coins)
         {
+            Sfx.Play("coin", 0.5f, 1.1f);
             _runCoins += coins;
             Splash(at, Config.reward, 5, 0.6f);
             _hud.Toast($"+{coins}", Config.reward, small: true);
