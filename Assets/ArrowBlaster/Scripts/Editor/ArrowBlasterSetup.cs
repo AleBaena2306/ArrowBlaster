@@ -82,12 +82,42 @@ namespace ArrowBlaster.Editor
         [MenuItem("POINTY DASH/Borrar partida guardada", priority = 2)]
         private static void ClearSave()
         {
-            if (!EditorUtility.DisplayDialog("Arrow Blaster", "¿Borrar las monedas, el récord y las mejoras guardados en este ordenador?", "Borrar", "Cancelar")) return;
+            if (!EditorUtility.DisplayDialog("Pointy Dash", "¿Borrar las monedas, el récord y las mejoras guardados en este ordenador?", "Borrar", "Cancelar")) return;
             PlayerPrefs.DeleteKey("ab_coins");
             PlayerPrefs.DeleteKey("ab_best");
             Upgrades.ResetAll();
             Save.ResetProgress();
             PlayerPrefs.Save();
+        }
+
+        // Bots programados juegan el juego entero varias veces desde cero, a toda velocidad,
+        // y apuntan cuánto tardan en cada jefe (BotRuns/resumen.txt y BotRuns/runs.csv).
+        [MenuItem("POINTY DASH/Bots/Simular progresión (6 bots)", priority = 40)]
+        private static void SimulateProgression()
+        {
+            if (!EditorUtility.DisplayDialog("Pointy Dash · Bots",
+                "Los bots empiezan desde cero y borran la partida guardada de este editor (monedas, mejoras y jefes).\n\n" +
+                "Se abre el modo Play y el juego va tan rápido como pueda el PC. Al terminar se para solo y deja el resultado en la carpeta BotRuns del proyecto.",
+                "Empezar", "Cancelar")) return;
+            SessionState.SetBool("pd_bots", true);
+            EditorApplication.isPlaying = true;
+        }
+
+        // Con Python escuchando (mlagents-learn MLAgents/pointy.yaml --run-id=pointy1) entrena el agente;
+        // sin Python, el agente juega con el bot programado.
+        [MenuItem("POINTY DASH/Bots/Entrenar con ML-Agents", priority = 42)]
+        private static void TrainMlAgents()
+        {
+            SessionState.SetBool("pd_mlagents", true);
+            EditorApplication.isPlaying = true;
+        }
+
+        [MenuItem("POINTY DASH/Bots/Abrir resultados", priority = 41)]
+        private static void OpenResults()
+        {
+            string dir = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..", "BotRuns"));
+            System.IO.Directory.CreateDirectory(dir);
+            EditorUtility.RevealInFinder(System.IO.Path.Combine(dir, "resumen.txt"));
         }
     }
 }

@@ -92,6 +92,16 @@ namespace ArrowBlaster
         public int lives = 3;
         [Tooltip("Fuerza que quita cada golpe recibido (la barra es velocidad y vida a la vez).")]
         public float hitForceCost = 18f;
+
+        [Header("Dificultad por zona (todas las zonas van en la misma run)")]
+        [Tooltip("Multiplica todo lo que quita fuerza de golpe en cada zona: choques, pinchos, ataques y roturas. En la zona 2 un choque debe dejarte casi sin fuerza.")]
+        public float[] zoneLossMultiplier = { 1f, 8f, 14f, 22f };
+        [Tooltip("Multiplica el desgaste continuo de fuerza en cada zona.")]
+        public float[] zoneDecayMultiplier = { 1f, 1.6f, 2.2f, 2.8f };
+        [Tooltip("Ritmo de subida que se le exige al jugador entre paredes (unidades por segundo). Más bajo = huecos más fáciles de alcanzar.")]
+        public float gapClimbRate = 3.2f;
+        [Tooltip("Ritmo de bajada exigible entre paredes (unidades por segundo).")]
+        public float gapDropRate = 6f;
         [Tooltip("Segundos de invulnerabilidad tras un golpe.")]
         public float invulnerableTime = 0.8f;
 

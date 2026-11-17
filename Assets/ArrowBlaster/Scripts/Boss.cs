@@ -13,6 +13,7 @@ namespace ArrowBlaster
         private SpriteRenderer _sprite;
         private Transform _spikes;
 
+        public override Kind BotKind => Kind.Boss;
         public override float RightEdge => float.MaxValue; // no desaparece por detrás: sigue a la flecha
 
         protected override void Build()

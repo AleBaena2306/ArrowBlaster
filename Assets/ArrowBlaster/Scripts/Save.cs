@@ -16,6 +16,11 @@ namespace ArrowBlaster
         public static int Zone { get => PlayerPrefs.GetInt("ab_zone", 0); set { PlayerPrefs.SetInt("ab_zone", value); PlayerPrefs.Save(); } }
         public static int Loop { get => PlayerPrefs.GetInt("ab_loop", 0); set { PlayerPrefs.SetInt("ab_loop", value); PlayerPrefs.Save(); } }
         public static float BossHp(int zone) => PlayerPrefs.GetFloat("ab_boss" + zone, -1f);
+        // Jefe derrotado: ya no vuelve a salir (hasta la siguiente vuelta de New Game+)
+        public static bool BossDead(int zone) => PlayerPrefs.GetInt("ab_bossdead" + zone, 0) == 1;
+        public static void SetBossDead(int zone, bool dead) { PlayerPrefs.SetInt("ab_bossdead" + zone, dead ? 1 : 0); PlayerPrefs.Save(); }
+        // Tiempo total jugado (segundos), para medir la duración del juego
+        public static float PlayTime { get => PlayerPrefs.GetFloat("ab_time", 0f); set => PlayerPrefs.SetFloat("ab_time", value); }
         public static void SetBossHp(int zone, float hp) { PlayerPrefs.SetFloat("ab_boss" + zone, hp); PlayerPrefs.Save(); }
 
         // Tutorial de la primera run (apuntar, impulso y golpe)
@@ -25,7 +30,8 @@ namespace ArrowBlaster
         {
             PlayerPrefs.DeleteKey("ab_zone");
             PlayerPrefs.DeleteKey("ab_loop");
-            for (int i = 0; i < 8; i++) PlayerPrefs.DeleteKey("ab_boss" + i);
+            for (int i = 0; i < 8; i++) { PlayerPrefs.DeleteKey("ab_boss" + i); PlayerPrefs.DeleteKey("ab_bossdead" + i); }
+            PlayerPrefs.DeleteKey("ab_time");
             PlayerPrefs.DeleteKey("ab_tut");
         }
 

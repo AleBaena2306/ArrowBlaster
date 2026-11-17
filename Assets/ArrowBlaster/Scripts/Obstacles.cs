@@ -16,6 +16,11 @@ namespace ArrowBlaster
 
         public virtual float RightEdge => transform.position.x + 2f;
 
+        // Pista para los bots: qué es y a qué altura está (lo que vería un jugador)
+        public enum Kind { None, Gap, Avoid, Collect, Boss }
+        public virtual Kind BotKind => Kind.None;
+        public virtual float BotY => transform.position.y;
+
         public void Init(ArrowGame game) { Game = game; Build(); }
         protected abstract void Build();
         public virtual void Tick(float dt) { }
@@ -43,6 +48,8 @@ namespace ArrowBlaster
     public sealed class WallGap : Obstacle
     {
         public float GapCenter;
+        public override Kind BotKind => Kind.Gap;
+        public override float BotY => GapCenter;
         private readonly List<(Transform root, Rect rect)> _parts = new List<(Transform, Rect)>();
 
         public override float RightEdge => transform.position.x + Cfg.wallWidth;
@@ -86,6 +93,8 @@ namespace ArrowBlaster
     public sealed class Enemy : Obstacle
     {
         private const float Radius = 0.6f;
+        public override Kind BotKind => Kind.Avoid;
+        public override float BotY => _body != null ? _body.position.y : transform.position.y;
         private float _fireTimer, _phase, _baseY;
         private Transform _body;
 
@@ -133,6 +142,7 @@ namespace ArrowBlaster
     {
         private const float Radius = 0.25f;
         public override float RightEdge => transform.position.x + Radius;
+        public override Kind BotKind => Kind.Avoid;
 
         protected override void Build()
         {
@@ -163,6 +173,8 @@ namespace ArrowBlaster
         private float _phase;
 
         public override float RightEdge => transform.position.x + 5f;
+        public override Kind BotKind => _targets.Count > 0 ? Kind.Collect : Kind.None;
+        public override float BotY => _targets.Count > 0 && _targets[0] != null ? _targets[0].position.y : transform.position.y;
 
         protected override void Build()
         {
@@ -212,12 +224,15 @@ namespace ArrowBlaster
         private float _phase;
 
         public override float RightEdge => transform.position.x + 7f;
+        public bool Good;
+        public override Kind BotKind => _items.Count == 0 ? Kind.None : Good ? Kind.Collect : Kind.Avoid;
 
         protected override void Build()
         {
             int count = Random.Range(4, 8);
             bool arc = Random.value < 0.5f;
             bool good = Random.value >= Cfg.badPickupChance; // todo el grupo es bueno o todo malo
+            Good = good;
             for (int i = 0; i < count; i++)
             {
                 float k = i / (float)(count - 1);

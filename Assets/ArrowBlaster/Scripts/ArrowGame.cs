@@ -42,6 +42,13 @@ namespace ArrowBlaster
         private bool _bossDone;
         private float _attackTimer, _attackCooldown;
         private float ZoneLength => Config.zoneLengths[Mathf.Clamp(_zone, 0, Config.zoneLengths.Length - 1)];
+        private float _zoneStartX;              // dónde empezó la zona actual (todas van en la misma run)
+        private float ZoneEnd => _zoneStartX + ZoneLength;
+        private float _lastGapY;                // altura del último hueco, para que el siguiente sea alcanzable
+        private float _lastGapX;
+        private static float Pick(float[] a, int i) => a == null || a.Length == 0 ? 1f : a[Mathf.Clamp(i, 0, a.Length - 1)];
+        private float Loss => Pick(Config.zoneLossMultiplier, _zone);
+        private float DecayZone => Pick(Config.zoneDecayMultiplier, _zone);
         private readonly List<Obstacle> _obstacles = new List<Obstacle>();
         private float _nextSpawnX;
 
@@ -72,9 +79,10 @@ namespace ArrowBlaster
             SetupCamera();
             EnsureEventSystem();
             Sfx.Init();
-            Art.P = Config.Palette(Mathf.Clamp(Save.Zone, 0, Config.zoneLengths.Length - 1));
+            Art.P = Config.Palette(0);
             _scenery = Scenery.Create(_cam, Config);
             _hud = new Hud(this, Config);
+            BotPlayer.Attach(this);
         }
 
         private void Start() => NewRun();
@@ -88,7 +96,7 @@ namespace ArrowBlaster
             _world = new GameObject("World").transform;
 
             // Cada zona tiene su paleta: se aplica antes de construir nada
-            Art.P = Config.Palette(Mathf.Clamp(Save.Zone, 0, Config.zoneLengths.Length - 1));
+            Art.P = Config.Palette(0);
             _scenery.SetPalette(Art.P);
 
             BuildLaunchArea();
@@ -107,12 +115,16 @@ namespace ArrowBlaster
             _attacking = false;
             _launchMultiplier = 1f;
             _nextSpawnX = Config.firstObstacleX;
-            _zone = Mathf.Clamp(Save.Zone, 0, Config.zoneLengths.Length - 1);
+            // Cada run empieza en la zona 1 y recorre las zonas en orden
+            _zone = 0;
+            _zoneStartX = 0f;
+            _lastGapY = 0f;
+            _lastGapX = 0f;
             _boss = null;
-            _bossDone = false;
+            _bossDone = Save.BossDead(0);
             _attackTimer = _attackCooldown = 0f;
             _state = State.Aim;
-            _tutStep = Save.TutorialDone ? -1 : 0;
+            _tutStep = Save.TutorialDone || Bot != null ? -1 : 0;
             _slowMo = false;
             _hud.ShowRun(_lives);
             _hud.SetHint("Drag back to aim · Release to shoot");
@@ -140,8 +152,9 @@ namespace ArrowBlaster
             UpdateArrowVisual();
             UpdateCamera(dt);
             if (_boss != null) _hud.SetProgress(_boss.Hp / _boss.MaxHp, true, "BOSS");
-            else if (_bossDone) _hud.SetProgress(1f, false, "ZONE CLEARED");
-            else _hud.SetProgress(Mathf.Clamp01(_pos.x / ZoneLength), false, Save.Loop > 0 ? $"ZONE {_zone + 1} · NG+{Save.Loop}" : $"ZONE {_zone + 1}");
+            else _hud.SetProgress(Mathf.Clamp01((_pos.x - _zoneStartX) / ZoneLength), false,
+                (Save.Loop > 0 ? $"ZONE {_zone + 1} · NG+{Save.Loop}" : $"ZONE {_zone + 1}") + (_bossDone ? " · BOSS DOWN" : ""));
+            if (_state == State.Flight || _state == State.Falling) Save.PlayTime += Time.deltaTime;
             _hud.Tick(_force, _state == State.Aim ? 1f : _startForce, _pos.x, Save.Coins + _runCoins,
                 draining: _attacking && _state == State.Flight, aiming: _state == State.Aim);
             _hud.SetAttackZone(_state == State.Flight && !_paused, Config.attackZone);
@@ -151,6 +164,12 @@ namespace ArrowBlaster
 
         private void ReadInput()
         {
+            if (Bot != null)
+            {
+                _pressedThisFrame = _releasedThisFrame = false;
+                Bot.Decide(this, Time.deltaTime, out _flapPressed, out _attackPressed);
+                return;
+            }
             bool down = (Input.GetMouseButtonDown(0) && !PointerOverUi()) || Input.GetKeyDown(KeyCode.Space);
             bool held = Input.GetMouseButton(0) || Input.GetKey(KeyCode.Space);
             _pressedThisFrame = down;
@@ -201,6 +220,15 @@ namespace ArrowBlaster
 
         private void UpdateAim(float dt)
         {
+            if (Bot != null)
+            {
+                _aimAngle = Mathf.Clamp(Bot.AimAngle(this), Config.minAimAngle, Config.maxAimAngle);
+                _draw = 1f;
+                _bow.Aim = _aimAngle;
+                PlaceArrowOnBow();
+                Shoot();
+                return;
+            }
             bool mouseHeld = Input.GetMouseButton(0);
             bool keyHeld = Input.GetKey(KeyCode.Space);
 
@@ -360,7 +388,7 @@ namespace ArrowBlaster
             {
                 _attackTimer = Config.attackDuration;
                 Sfx.Play("attack", 0.6f);
-                _force = Mathf.Max(0f, _force - Config.attackForceCost * Upgrades.AttackCostMultiplier);
+                _force = Mathf.Max(0f, _force - Config.attackForceCost * Upgrades.AttackCostMultiplier * Loss);
                 _shake = Mathf.Max(_shake, 0.08f);
             }
             _attacking = _attackTimer > 0f;
@@ -368,7 +396,7 @@ namespace ArrowBlaster
             if (_attacking) _vel.y = Mathf.MoveTowards(_vel.y, 0f, 60f * dt); // línea recta
             else _vel.y -= Config.gravity * dt;
 
-            float drain = Config.forceDecayPerSecond * Upgrades.DecayMultiplier;
+            float drain = Config.forceDecayPerSecond * Upgrades.DecayMultiplier * DecayZone;
             _force = Mathf.Max(0f, _force - drain * dt);
             _vel.x = Speed();
             _pos += _vel * dt;
@@ -441,6 +469,8 @@ namespace ArrowBlaster
             Save.AddRun(earned, _pos.x);
             _runCoins = 0;
             _hud.ShowOver(_pos.x, earned, Save.BestDistance, record, "Out of force");
+            LastRunCoins = earned;
+            Analytics("run_end");
         }
 
         // ───────────────────────── Golpes ─────────────────────────
@@ -449,8 +479,9 @@ namespace ArrowBlaster
         {
             if (_invulnerable > 0f || _state != State.Flight) return;
             // Una sola barra: cada golpe quita fuerza (velocidad y vida a la vez)
-            _force = Mathf.Max(0f, _force - Config.hitForceCost * Upgrades.HitCostMultiplier);
+            _force = Mathf.Max(0f, _force - Config.hitForceCost * Upgrades.HitCostMultiplier * Loss);
             Sfx.Play("hurt", 0.9f);
+            Analytics("hurt");
             _invulnerable = Config.invulnerableTime;
             _shake = 0.35f;
             Splash(at, Config.danger, 8, 1f);
@@ -461,7 +492,7 @@ namespace ArrowBlaster
         public void Break(Vector2 at, float forceCost, int coins, Color color)
         {
             Sfx.Play("break", 0.8f, 1f, 3);
-            _force = Mathf.Max(0f, _force - forceCost * Upgrades.AttackCostMultiplier);
+            _force = Mathf.Max(0f, _force - forceCost * Upgrades.AttackCostMultiplier * Loss);
             _runCoins += coins;
             _shake = Mathf.Max(_shake, 0.15f);
             Splash(at, color, 10, 1.1f);
@@ -504,13 +535,21 @@ namespace ArrowBlaster
             int reward = Config.bossReward[Mathf.Clamp(_zone, 0, Config.bossReward.Length - 1)] * (1 + Save.Loop);
             _runCoins += reward;
             Save.SetBossHp(_zone, -1f);
+            Save.SetBossDead(_zone, true);
             Sfx.Play("boss_defeat", 0.9f);
-            int next = _zone + 1;
-            if (next >= Config.zoneLengths.Length) { next = 0; Save.Loop = Save.Loop + 1; }
-            Save.Zone = next;
             _bossDone = true;
             _boss = null;
             _nextSpawnX = _pos.x + 25f;
+            Analytics("boss_defeated");
+            // Último jefe: juego completado; empieza la vuelta de New Game+ (jefes más duros, otra vez vivos)
+            if (_zone >= Config.zoneLengths.Length - 1)
+            {
+                Save.Loop = Save.Loop + 1;
+                for (int z = 0; z < Config.zoneLengths.Length; z++) { Save.SetBossDead(z, false); Save.SetBossHp(z, -1f); }
+                Save.Zone = 0;
+                _hud.Toast("YOU BEAT THE GAME!", Config.reward);
+            }
+            else EnterZone(_zone + 1, _pos.x + 6f);
             Splash(boss.transform.position, Config.attack, 18, 2f);
             Splash(boss.transform.position, Color.white, 14, 1.6f);
             _shake = 0.6f;
@@ -529,7 +568,7 @@ namespace ArrowBlaster
             }
             else
             {
-                _force = Mathf.Max(0f, _force - Config.pickupForce);
+                _force = Mathf.Max(0f, _force - Config.pickupForce * Loss);
                 Splash(at, Color.white, 5, 0.6f);
                 _shake = Mathf.Max(_shake, 0.12f);
             }
@@ -546,7 +585,7 @@ namespace ArrowBlaster
 
         private IEnumerator HitStop(float seconds)
         {
-            if (_paused) yield break;
+            if (_paused || Bot != null) yield break;
             Time.timeScale = 0.05f;
             yield return new WaitForSecondsRealtime(seconds);
             if (!_paused) Time.timeScale = BaseTimeScale;
@@ -568,15 +607,61 @@ namespace ArrowBlaster
         private void SpawnAhead()
         {
             float viewRight = _cam.transform.position.x + _cam.orthographicSize * _cam.aspect;
-            // Jefe al final de la zona; antes de él no se ponen más obstáculos
-            if (!_bossDone && _boss == null && _pos.x >= ZoneLength - 14f) SpawnBoss();
+            // Jefe al final de la zona; antes de él no se ponen más obstáculos.
+            // Si el jefe ya cayó en una run anterior, se cruza a la zona siguiente sin pelear.
+            if (!_bossDone && _boss == null && _pos.x >= ZoneEnd - 14f) SpawnBoss();
+            if (_bossDone && _boss == null && _pos.x >= ZoneEnd && _zone < Config.zoneLengths.Length - 1) EnterZone(_zone + 1, ZoneEnd);
             while (_nextSpawnX < viewRight + 15f)
             {
-                if (!_bossDone && _nextSpawnX > ZoneLength - 22f) break;
+                if (!_bossDone && _nextSpawnX > ZoneEnd - 22f) break;
                 SpawnOne(_nextSpawnX);
                 _nextSpawnX += Random.Range(Config.minSpacing, Config.maxSpacing);
             }
         }
+
+        // Paso a la zona siguiente dentro de la misma run: nueva paleta y dificultad
+        private void EnterZone(int zone, float startX)
+        {
+            _zone = zone;
+            _zoneStartX = startX;
+            _bossDone = Save.BossDead(zone);
+            if (zone > Save.Zone) Save.Zone = zone;
+            Art.P = Config.Palette(zone);
+            _scenery.SetPalette(Art.P);
+            _hud.Toast($"ZONE {zone + 1}", Config.reward);
+            _shake = Mathf.Max(_shake, 0.25f);
+        }
+
+        // Hueco alcanzable: entre una pared y la siguiente solo se exige subir o bajar
+        // lo que da tiempo a la velocidad actual (con margen), nunca un salto imposible.
+        private float ReachableGap(float x, float margin)
+        {
+            float lo = Config.groundY + margin, hi = Config.ceilingY - margin;
+            float travel = Mathf.Max(0.2f, (x - Mathf.Max(_lastGapX, _pos.x)) / Mathf.Max(4f, Speed()));
+            float up = Config.gapClimbRate * travel, down = Config.gapDropRate * travel;
+            float from = _lastGapX <= 0f ? Mathf.Clamp(_pos.y, lo, hi) : _lastGapY;
+            float y = Random.Range(Mathf.Max(lo, from - down), Mathf.Min(hi, from + up));
+            _lastGapY = y;
+            _lastGapX = x;
+            return y;
+        }
+
+        // Gancho de analítica (los bots de ML-Agents y el registro de equilibrado lo escuchan)
+        public System.Action<string> OnEvent;
+        // Si no es null, juega un bot (BotBrain o un agente de ML-Agents) en vez de la persona
+        public IBotInput Bot;
+        // Lectura para bots y simulaciones
+        public int LastRunCoins { get; private set; }
+        public int Zone => _zone;
+        public float Distance => _pos.x;
+        public float Force => _force;
+        public bool InFlight => _state == State.Flight;
+        public bool IsOver => _state == State.Over;
+        public bool IsAiming => _state == State.Aim;
+        public Vector2 Position => _pos;
+        public Vector2 Velocity => _vel;
+        public System.Collections.Generic.IReadOnlyList<Obstacle> Obstacles => _obstacles;
+        private void Analytics(string id) => OnEvent?.Invoke(id);
 
         private void SpawnOne(float x)
         {
@@ -590,7 +675,7 @@ namespace ArrowBlaster
                 go.transform.SetParent(_world, false);
                 go.transform.position = new Vector2(x, 0f);
                 var w = go.AddComponent<WallGap>();
-                w.GapCenter = Random.Range(Config.groundY + margin, Config.ceilingY - margin);
+                w.GapCenter = ReachableGap(x, margin);
                 w.Init(this);
                 _obstacles.Add(w);
             }

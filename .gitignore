@@ -31,3 +31,7 @@ crashlytics-buildid.txt
 .idea/
 .DS_Store
 Thumbs.db
+
+# Resultados de los bots y entrenamientos de ML-Agents
+BotRuns/
+results/

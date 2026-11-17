@@ -1,0 +1,25 @@
+{
+    "name": "ArrowBlaster.MLAgents",
+    "rootNamespace": "ArrowBlaster",
+    "references": [
+        "ArrowBlaster",
+        "Unity.ML-Agents"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "POINTY_MLAGENTS"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.ml-agents",
+            "expression": "4.0.0",
+            "define": "POINTY_MLAGENTS"
+        }
+    ],
+    "noEngineReferences": false
+}
