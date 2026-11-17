@@ -95,7 +95,7 @@ namespace ArrowBlaster
 
         [Header("Dificultad por zona (todas las zonas van en la misma run)")]
         [Tooltip("Multiplica todo lo que quita fuerza de golpe en cada zona: choques, pinchos, ataques y roturas. En la zona 2 un choque debe dejarte casi sin fuerza.")]
-        public float[] zoneLossMultiplier = { 1f, 8f, 14f, 22f };
+        public float[] zoneLossMultiplier = { 1f, 3f, 5f, 8f };
         [Tooltip("Multiplica el desgaste continuo de fuerza en cada zona.")]
         public float[] zoneDecayMultiplier = { 1f, 1.6f, 2.2f, 2.8f };
         [Tooltip("Ritmo de subida que se le exige al jugador entre paredes (unidades por segundo). Más bajo = huecos más fáciles de alcanzar.")]
@@ -149,8 +149,8 @@ namespace ArrowBlaster
         public float bossChargeSpeed = 22f;
 
         [Header("Monedas")]
-        public float coinsPerMeter = 0.1f;
-        public int coinsPerTarget = 5;
+        public float coinsPerMeter = 0.2f;
+        public int coinsPerTarget = 8;
         public int coinsPerEnemy = 10;
         public int coinsPerWall = 3;
 

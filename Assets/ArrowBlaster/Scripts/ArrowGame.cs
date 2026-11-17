@@ -568,7 +568,7 @@ namespace ArrowBlaster
             }
             else
             {
-                _force = Mathf.Max(0f, _force - Config.pickupForce * Loss);
+                _force = Mathf.Max(0f, _force - Config.pickupForce * Loss * Upgrades.HitCostMultiplier);
                 Splash(at, Color.white, 5, 0.6f);
                 _shake = Mathf.Max(_shake, 0.12f);
             }

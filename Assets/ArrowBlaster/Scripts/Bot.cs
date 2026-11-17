@@ -133,7 +133,7 @@ namespace ArrowBlaster
         public static bool Requested;           // lo activa el menú POINTY DASH > Bots
         public int players = 6;
         public float minSkill = 0.35f, maxSkill = 0.8f;
-        public float maxHoursPerPlayer = 4f;    // tope por si un bot se atasca
+        public float maxHoursPerPlayer = 3f;    // tope por si un bot se atasca
         public float overheadPerRun = 10f;      // segundos reales por run que no son vuelo (apuntar, tienda)
 
         private ArrowGame _game;
@@ -162,7 +162,7 @@ namespace ArrowBlaster
             AudioListener.volume = 0f;
             _dir = Path.Combine(Application.dataPath, "..", "BotRuns");
             Directory.CreateDirectory(_dir);
-            _csv.AppendLine("player,skill,run,play_minutes,zone_reached,distance,coins,bosses_dead,loss_zone,upgrades");
+            _csv.AppendLine("player;skill;run;play_minutes;zone_reached;distance;coins;bosses_dead;upgrades");
             _game.OnEvent += OnGameEvent;
             NextPlayer();
         }
@@ -220,7 +220,8 @@ namespace ArrowBlaster
             }
             var ups = new StringBuilder();
             foreach (Stat s in System.Enum.GetValues(typeof(Stat))) ups.Append(s).Append('=').Append(Upgrades.Level(s)).Append(' ');
-            _csv.AppendLine($"{_player + 1},{SkillOf(_player):0.00},{_runs},{Minutes:0.0},{_game.Zone + 1},{_game.Distance:0},{_game.LastRunCoins},{dead},{_game.Zone + 1},{ups.ToString().Trim()}");
+            // Punto y coma: Excel en español usa la coma para los decimales
+            _csv.AppendLine($"{_player + 1};{SkillOf(_player):0.00};{_runs};{Minutes:0.0};{_game.Zone + 1};{_game.Distance:0};{_game.LastRunCoins};{dead};{ups.ToString().Trim()}");
 
             bool beaten = Save.Loop > 0;
             bool timeout = Minutes > maxHoursPerPlayer * 60f;
