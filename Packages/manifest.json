@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.kovuspride.framework": "https://github.com/AleBaena2306/KovusPrideFramework.git#v0.1.0",
+    "com.kovuspride.framework": "https://github.com/AleBaena2306/KovusPrideFramework.git#v0.1.1",
     "com.unity.ai.navigation": "2.0.9",
     "com.unity.collab-proxy": "2.14.0",
     "com.unity.ide.rider": "3.0.37",
