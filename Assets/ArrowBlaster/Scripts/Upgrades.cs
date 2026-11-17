@@ -17,7 +17,7 @@ namespace ArrowBlaster
         {
             new Def { Stat = Stat.Power, Name = "POWER", Detail = "Launch force", Color = new Color32(0xD7, 0x26, 0x3D, 0xFF), MaxLevel = 15, BaseCost = 25, Growth = 1.35f },
             new Def { Stat = Stat.Aim, Name = "AIM", Detail = "Slower target", Color = new Color32(0x2A, 0x7F, 0xD4, 0xFF), MaxLevel = 10, BaseCost = 30, Growth = 1.4f },
-            new Def { Stat = Stat.Life, Name = "LIFE", Detail = "Extra hits", Color = new Color32(0x3B, 0xA5, 0x5C, 0xFF), MaxLevel = 6, BaseCost = 60, Growth = 1.8f },
+            new Def { Stat = Stat.Life, Name = "ARMOR", Detail = "Hits take less force", Color = new Color32(0x3B, 0xA5, 0x5C, 0xFF), MaxLevel = 6, BaseCost = 60, Growth = 1.8f },
             new Def { Stat = Stat.Speed, Name = "SPEED", Detail = "Faster, lasts longer", Color = new Color32(0xE8, 0xA3, 0x17, 0xFF), MaxLevel = 15, BaseCost = 30, Growth = 1.35f },
             new Def { Stat = Stat.Destruction, Name = "DESTRUCTION", Detail = "Cheaper attacks, more boss damage", Color = new Color32(0x8E, 0x44, 0xAD, 0xFF), MaxLevel = 15, BaseCost = 35, Growth = 1.38f },
             new Def { Stat = Stat.Target, Name = "TARGET", Detail = "Bigger boost from the target", Color = new Color32(0x17, 0xA2, 0xB8, 0xFF), MaxLevel = 10, BaseCost = 40, Growth = 1.42f },
@@ -42,7 +42,8 @@ namespace ArrowBlaster
         // Efectos
         public static float PowerMultiplier => 1f + 0.15f * Level(Stat.Power);
         public static float TargetSpeedMultiplier => Mathf.Max(0.35f, 1f - 0.065f * Level(Stat.Aim));
-        public static int ExtraLives => Level(Stat.Life);
+        public static int ExtraLives => 0;
+        public static float HitCostMultiplier => Mathf.Max(0.4f, 1f - 0.1f * Level(Stat.Life));
         public static float SpeedMultiplier => 1f + 0.04f * Level(Stat.Speed);
         public static float DecayMultiplier => Mathf.Max(0.35f, 1f - 0.045f * Level(Stat.Speed));
         public static float BossDamageMultiplier => 1f + 0.12f * Level(Stat.Destruction);

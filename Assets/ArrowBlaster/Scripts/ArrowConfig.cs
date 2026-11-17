@@ -88,7 +88,10 @@ namespace ArrowBlaster
         public float arrowRadius = 0.18f;
 
         [Header("Vida")]
+        [Tooltip("Ya no se usa: la barra de fuerza es también la vida.")]
         public int lives = 3;
+        [Tooltip("Fuerza que quita cada golpe recibido (la barra es velocidad y vida a la vez).")]
+        public float hitForceCost = 18f;
         [Tooltip("Segundos de invulnerabilidad tras un golpe.")]
         public float invulnerableTime = 0.8f;
 

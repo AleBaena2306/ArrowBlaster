@@ -253,18 +253,8 @@ namespace ArrowBlaster
             _coins.text = coins.ToString();
         }
 
-        public void SetLives(int lives)
-        {
-            while (_lives.Count < _cfg.lives)
-            {
-                int i = _lives.Count;
-                var img = Box("Life", _livesRow, new Vector2(0, 0.5f), new Vector2(10 + i * 56, 0), new Vector2(46, 46), _cfg.uiInk).GetComponent<Image>();
-                img.sprite = Art.Heart;
-                _lives.Add(img);
-            }
-            for (int i = 0; i < _lives.Count; i++)
-                _lives[i].color = i < lives ? _cfg.attack : new Color(_cfg.uiInk.r, _cfg.uiInk.g, _cfg.uiInk.b, 0.15f);
-        }
+        // Sin vidas aparte: la barra de fuerza es también la vida
+        public void SetLives(int lives) => _livesRow.gameObject.SetActive(false);
 
         public void Toast(string text, Color color, bool small = false)
         {

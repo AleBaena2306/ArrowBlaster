@@ -402,7 +402,7 @@ namespace ArrowBlaster
                 }
             }
 
-            if (_state == State.Flight && (_force <= 0f || _lives <= 0)) StartFalling();
+            if (_state == State.Flight && _force <= 0f) StartFalling();
         }
 
         private void StartFalling()
@@ -435,7 +435,7 @@ namespace ArrowBlaster
             bool record = _pos.x > Save.BestDistance;
             Save.AddRun(earned, _pos.x);
             _runCoins = 0;
-            _hud.ShowOver(_pos.x, earned, Save.BestDistance, record, _force <= 0f ? "Out of force" : "Out of life");
+            _hud.ShowOver(_pos.x, earned, Save.BestDistance, record, "Out of force");
         }
 
         // ───────────────────────── Golpes ─────────────────────────
@@ -443,7 +443,8 @@ namespace ArrowBlaster
         public void Damage(Vector2 at)
         {
             if (_invulnerable > 0f || _state != State.Flight) return;
-            _lives--;
+            // Una sola barra: cada golpe quita fuerza (velocidad y vida a la vez)
+            _force = Mathf.Max(0f, _force - Config.hitForceCost * Upgrades.HitCostMultiplier);
             _invulnerable = Config.invulnerableTime;
             _shake = 0.35f;
             Splash(at, Config.danger, 8, 1f);
