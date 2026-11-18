@@ -138,20 +138,31 @@ namespace ArrowBlaster
 
         private ArrowGame _game;
         private int _player = -1, _runs;
+        private float _realStart;
         private float _restartIn;
         private readonly StringBuilder _csv = new StringBuilder();
         private readonly StringBuilder _summary = new StringBuilder();
         private readonly List<float> _completions = new List<float>();
-        private string _dir;
+        private string _dir, _outDir;
 
         public static void Attach(ArrowGame game)
         {
 #if UNITY_EDITOR
             if (UnityEditor.SessionState.GetBool("pd_bots", false)) { Requested = true; UnityEditor.SessionState.SetBool("pd_bots", false); }
 #endif
+            // Build sin pantalla en los servidores de GitHub: PointyBots -batchmode -nographics -bots [-botPlayers 4] [-botHours 2.5] [-botOut carpeta]
+            string[] args = System.Environment.GetCommandLineArgs();
+            if (System.Array.IndexOf(args, "-bots") >= 0) Requested = true;
             if (!Requested) return;
             var bp = game.gameObject.AddComponent<BotPlayer>();
             bp._game = game;
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                var inv = System.Globalization.CultureInfo.InvariantCulture;
+                if (args[i] == "-botPlayers" && int.TryParse(args[i + 1], out int n)) bp.players = Mathf.Max(1, n);
+                else if (args[i] == "-botHours" && float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float, inv, out float h)) bp.maxHoursPerPlayer = h;
+                else if (args[i] == "-botOut") bp._outDir = args[i + 1];
+            }
         }
 
         private void Start()
@@ -160,7 +171,7 @@ namespace ArrowBlaster
             Application.targetFrameRate = -1;
             Time.captureDeltaTime = 1f / 50f;   // cada fotograma avanza 0,02 s de juego, tan rápido como pueda el PC
             AudioListener.volume = 0f;
-            _dir = Path.Combine(Application.dataPath, "..", "BotRuns");
+            _dir = !string.IsNullOrEmpty(_outDir) ? _outDir : Path.Combine(Application.dataPath, "..", "BotRuns");
             Directory.CreateDirectory(_dir);
             _csv.AppendLine("player;skill;run;play_minutes;zone_reached;distance;coins;bosses_dead;upgrades");
             _game.OnEvent += OnGameEvent;
@@ -184,6 +195,7 @@ namespace ArrowBlaster
             PlayerPrefs.DeleteAll();
             Save.TutorialDone = true;
             _runs = 0;
+            _realStart = Time.realtimeSinceStartup;
             float skill = SkillOf(_player);
             _game.Bot = new BotBrain(skill);
             _summary.AppendLine($"Bot {_player + 1} (habilidad {skill:0.00}):");
@@ -231,7 +243,8 @@ namespace ArrowBlaster
             bool timeout = Minutes > maxHoursPerPlayer * 60f;
             if (beaten || timeout)
             {
-                _summary.AppendLine(beaten ? $"  JUEGO COMPLETADO en {Minutes:0.0} min ({_runs} runs)" : $"  NO lo completa en {maxHoursPerPlayer:0} h (llega a la zona {Save.Zone + 1})");
+                _summary.AppendLine((beaten ? $"  JUEGO COMPLETADO en {Minutes:0.0} min ({_runs} runs)" : $"  NO lo completa en {maxHoursPerPlayer:0.#} h (llega a la zona {Save.Zone + 1})")
+                    + $" · simulado en {Time.realtimeSinceStartup - _realStart:0} s reales");
                 if (beaten) _completions.Add(Minutes);
                 File.WriteAllText(Path.Combine(_dir, "runs.csv"), _csv.ToString());
                 NextPlayer();
@@ -255,6 +268,8 @@ namespace ArrowBlaster
             Time.captureDeltaTime = 0f;
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit(0);
 #endif
         }
     }

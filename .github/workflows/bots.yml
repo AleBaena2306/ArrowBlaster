@@ -1,0 +1,82 @@
+# Bots de equilibrado en los servidores de GitHub (sin usar el PC).
+# Lanzar: pestaña Actions > «Bots» > Run workflow (también desde la app de GitHub en el móvil).
+# Resultados: carpeta BotResults/<fecha> del repositorio (se actualiza cada 10 min mientras juegan) y artefacto del run.
+# Requiere los secretos UNITY_EMAIL, UNITY_PASSWORD y UNITY_LICENSE (contenido de C:\ProgramData\Unity\Unity_lic.ulf).
+name: Bots
+
+on:
+  workflow_dispatch:
+    inputs:
+      players:
+        description: "Número de bots (de torpe a bueno)"
+        default: "4"
+      hours:
+        description: "Tope de horas de juego por bot"
+        default: "2.5"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bots
+  cancel-in-progress: false
+
+jobs:
+  bots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Caché de la carpeta Library (acelera las siguientes ejecuciones)
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-Linux-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: Library-Linux-
+
+      - name: Compilar el juego para Linux (sin pantalla)
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: StandaloneLinux64
+          buildName: PointyBots
+          allowDirtyBuild: true
+
+      - name: Jugar (los resultados se suben cada 10 min)
+        env:
+          PLAYERS: ${{ github.event.inputs.players }}
+          HOURS: ${{ github.event.inputs.hours }}
+        run: |
+          OUT="BotResults/$(date -u +%Y-%m-%d_%H%M)"
+          mkdir -p "$OUT"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+          BIN=build/StandaloneLinux64/PointyBots.x86_64
+          sudo chmod +x "$BIN"
+          git config user.name "Pointy Dash Bots"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          "$BIN" -batchmode -nographics -bots -botPlayers "${PLAYERS:-4}" -botHours "${HOURS:-2.5}" -botOut "$PWD/$OUT" -logFile "$OUT/player.log" &
+          PID=$!
+          publish() {
+            git add "$OUT" >/dev/null 2>&1 || true
+            if ! git diff --cached --quiet; then
+              git commit -q -m "Bots: resultados $OUT" && (git pull -q --rebase && git push -q || echo "push falló, se reintenta luego")
+            fi
+          }
+          while kill -0 $PID 2>/dev/null; do
+            for i in $(seq 60); do kill -0 $PID 2>/dev/null || break; sleep 10; done
+            publish
+          done
+          wait $PID || echo "El juego terminó con código $?"
+          publish
+          cat "$OUT/resumen.txt" 2>/dev/null || tail -50 "$OUT/player.log"
+
+      - name: Guardar resultados como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-results
+          path: BotResults
